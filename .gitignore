@@ -1,0 +1,39 @@
+.DS_Store
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+
+# Coverage and notebook artifacts
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Packaging artifacts
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Local secrets and machine-specific config
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+
+# Generated outputs and local scratch files
+_llm_context.txt
+_xyce_runs/
+data/input/
+data/output/
+data/analysis/
+data/figures/
+experiments/xyce_debug/
+op.csv
