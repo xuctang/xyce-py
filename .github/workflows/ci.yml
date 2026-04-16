@@ -133,7 +133,8 @@ jobs:
           "$VENV_PY" -m pip install "$(python tools/release_helpers.py wheel-path --dist-dir dist)" pytest
 
       - name: Run packaging smoke tests
-        run: "$VENV_PY" -m pytest tests/packaging -m packaging
+        run: |
+          "$VENV_PY" -m pytest tests/packaging -m packaging
 
   sdist-smoke:
     name: sdist smoke (py${{ matrix.python-version }})
