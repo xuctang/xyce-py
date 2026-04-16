@@ -1,12 +1,30 @@
 name: Publish
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
 
 jobs:
-  build:
+  validate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Ensure the project version is final
+        id: version
+        run: |
+          version="$(python tools/release_helpers.py require-final)"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+  build-distributions:
+    needs: validate-version
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -17,20 +35,122 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install build backend
-        run: python -m pip install --upgrade build
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip && python -m pip install build twine
 
       - name: Build distributions
         run: python -m build
 
-      - name: Upload build artifacts
+      - name: Validate package metadata
+        run: python -m twine check dist/*
+
+      - name: Upload distributions
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
-          path: dist/
+          path: dist/*
+
+  smoke-install:
+    needs: [validate-version, build-distributions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install built wheel into a fresh virtualenv
+        run: |
+          python -m venv .pkg-venv
+          ./.pkg-venv/bin/python -m pip install --upgrade pip
+          ./.pkg-venv/bin/python -m pip install "$(python tools/release_helpers.py wheel-path --dist-dir dist)" pytest
+
+      - name: Run packaging and README smoke tests
+        run: ./.pkg-venv/bin/python -m pytest tests/packaging tests/unit/test_readme_examples.py
+
+      - name: Write smoke summary
+        if: always()
+        run: |
+          {
+            echo "## Final Release Smoke Install"
+            echo ""
+            echo "- Version: \`${{ needs.validate-version.outputs.version }}\`"
+            echo "- Built wheel: \`$(python tools/release_helpers.py wheel-path --dist-dir dist)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dependency-audit:
+    needs: [validate-version, build-distributions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip && python -m pip install pip-audit
+
+      - name: Install the built wheel into a clean audit environment
+        run: |
+          python -m venv .audit-venv
+          ./.audit-venv/bin/python -m pip install --upgrade pip
+          ./.audit-venv/bin/python -m pip install "$(python tools/release_helpers.py wheel-path --dist-dir dist)"
+
+      - name: Audit runtime dependencies
+        run: |
+          site_packages="$(python tools/release_helpers.py site-packages-path --python-executable ./.audit-venv/bin/python)"
+          python tools/pip_audit_policy.py run \
+            --allowlist security/pip_audit_allowlist.json \
+            --path "$site_packages" \
+            --output pip-audit.txt
+
+      - name: Write audit summary
+        if: always()
+        run: |
+          {
+            echo "## Dependency Audit"
+            echo ""
+            echo "- Version: \`${{ needs.validate-version.outputs.version }}\`"
+            echo "- Wheel: \`$(python tools/release_helpers.py wheel-path --dist-dir dist)\`"
+            echo "- Allowlist: \`security/pip_audit_allowlist.json\`"
+            echo ""
+            echo '```text'
+            if [[ -f pip-audit.txt ]]; then
+              cat pip-audit.txt
+            else
+              echo "pip-audit did not produce output."
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-results
+          path: pip-audit.txt
+          if-no-files-found: warn
 
   publish-to-pypi:
-    needs: build
+    needs: [validate-version, build-distributions, smoke-install, dependency-audit]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -38,11 +158,11 @@ jobs:
       name: pypi
       url: https://pypi.org/p/xyce-py
     steps:
-      - name: Download build artifacts
+      - name: Download distributions
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
-          path: dist/
+          path: dist
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

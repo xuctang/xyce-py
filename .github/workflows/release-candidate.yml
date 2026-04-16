@@ -1,0 +1,307 @@
+name: Release Candidate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Ensure the project version is a release candidate
+        id: version
+        run: |
+          version="$(python tools/release_helpers.py require-prerelease)"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+  xyce-release-gate-linux:
+    needs: validate-version
+    runs-on: [self-hosted, linux, xyce]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[test]'
+
+      - name: Run real Xyce integration suite
+        run: pytest tests/integration -m xyce
+
+      - name: Write Linux Xyce gate summary
+        if: always()
+        run: |
+          {
+            echo "## Linux Xyce Release Gate"
+            echo ""
+            echo "- Runner OS: $RUNNER_OS"
+            echo "- Runner Architecture: $RUNNER_ARCH"
+            echo "- Python: $(python --version 2>&1)"
+            echo "- Xyce path: $(command -v Xyce || echo 'not found')"
+            echo "- Xyce version:"
+            echo '```text'
+            Xyce -v 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  xyce-release-gate-macos:
+    needs: validate-version
+    runs-on: [self-hosted, macos, xyce]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[test]'
+
+      - name: Run real Xyce integration suite
+        run: pytest tests/integration -m xyce
+
+      - name: Write macOS Xyce gate summary
+        if: always()
+        run: |
+          {
+            echo "## macOS Xyce Release Gate"
+            echo ""
+            echo "- Runner OS: $RUNNER_OS"
+            echo "- Runner Architecture: $RUNNER_ARCH"
+            echo "- Python: $(python --version 2>&1)"
+            echo "- Xyce path: $(command -v Xyce || echo 'not found')"
+            echo "- Xyce version:"
+            echo '```text'
+            Xyce -v 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build-distributions:
+    needs: validate-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip && python -m pip install build twine
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Validate package metadata
+        run: python -m twine check dist/*
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/*
+
+  dependency-audit:
+    needs: [validate-version, build-distributions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip && python -m pip install pip-audit
+
+      - name: Install the built wheel into a clean audit environment
+        run: |
+          python -m venv .audit-venv
+          ./.audit-venv/bin/python -m pip install --upgrade pip
+          ./.audit-venv/bin/python -m pip install "$(python tools/release_helpers.py wheel-path --dist-dir dist)"
+
+      - name: Audit runtime dependencies
+        run: |
+          site_packages="$(python tools/release_helpers.py site-packages-path --python-executable ./.audit-venv/bin/python)"
+          python tools/pip_audit_policy.py run \
+            --allowlist security/pip_audit_allowlist.json \
+            --path "$site_packages" \
+            --output pip-audit.txt
+
+      - name: Write audit summary
+        if: always()
+        run: |
+          {
+            echo "## Dependency Audit"
+            echo ""
+            echo "- Version: \`${{ needs.validate-version.outputs.version }}\`"
+            echo "- Wheel: \`$(python tools/release_helpers.py wheel-path --dist-dir dist)\`"
+            echo "- Allowlist: \`security/pip_audit_allowlist.json\`"
+            echo ""
+            echo '```text'
+            if [[ -f pip-audit.txt ]]; then
+              cat pip-audit.txt
+            else
+              echo "pip-audit did not produce output."
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-results
+          path: pip-audit.txt
+          if-no-files-found: warn
+
+  publish-to-testpypi:
+    needs:
+      - validate-version
+      - xyce-release-gate-linux
+      - xyce-release-gate-macos
+      - build-distributions
+      - dependency-audit
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/xyce-py
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  testpypi-wheel-smoke:
+    needs: [validate-version, publish-to-testpypi, build-distributions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the release candidate wheel from TestPyPI
+        run: |
+          python -m venv .pkg-venv
+          ./.pkg-venv/bin/python -m pip install --upgrade pip
+          for attempt in 1 2 3 4 5; do
+            if ./.pkg-venv/bin/python -m pip install \
+              --index-url https://test.pypi.org/simple/ \
+              --extra-index-url https://pypi.org/simple \
+              "xyce-py==${{ needs.validate-version.outputs.version }}" \
+              pytest; then
+              break
+            fi
+            if [[ "$attempt" == "5" ]]; then
+              exit 1
+            fi
+            sleep 15
+          done
+
+      - name: Run wheel smoke tests against the TestPyPI install
+        run: ./.pkg-venv/bin/python -m pytest tests/packaging tests/unit/test_readme_examples.py
+
+      - name: Write wheel smoke summary
+        if: always()
+        run: |
+          {
+            echo "## TestPyPI Wheel Smoke"
+            echo ""
+            echo "- Version: \`${{ needs.validate-version.outputs.version }}\`"
+            echo "- Install command: \`python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple xyce-py==${{ needs.validate-version.outputs.version }}\`"
+            echo "- Built wheel: \`$(python tools/release_helpers.py wheel-path --dist-dir dist)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  testpypi-sdist-smoke:
+    needs: [validate-version, publish-to-testpypi, build-distributions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the release candidate sdist from TestPyPI
+        run: |
+          python -m venv .pkg-sdist-venv
+          ./.pkg-sdist-venv/bin/python -m pip install --upgrade pip
+          for attempt in 1 2 3 4 5; do
+            if ./.pkg-sdist-venv/bin/python -m pip install \
+              --index-url https://test.pypi.org/simple/ \
+              --extra-index-url https://pypi.org/simple \
+              --no-binary xyce-py \
+              "xyce-py==${{ needs.validate-version.outputs.version }}" \
+              pytest; then
+              break
+            fi
+            if [[ "$attempt" == "5" ]]; then
+              exit 1
+            fi
+            sleep 15
+          done
+
+      - name: Run sdist smoke tests against the TestPyPI install
+        run: ./.pkg-sdist-venv/bin/python -m pytest tests/packaging tests/unit/test_readme_examples.py
+
+      - name: Write sdist smoke summary
+        if: always()
+        run: |
+          {
+            echo "## TestPyPI Source Install Smoke"
+            echo ""
+            echo "- Version: \`${{ needs.validate-version.outputs.version }}\`"
+            echo "- Install command: \`python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple --no-binary xyce-py xyce-py==${{ needs.validate-version.outputs.version }}\`"
+            echo "- Built sdist: \`$(python tools/release_helpers.py sdist-path --dist-dir dist)\`"
+          } >> "$GITHUB_STEP_SUMMARY"

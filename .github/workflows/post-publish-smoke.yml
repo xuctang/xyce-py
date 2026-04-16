@@ -1,0 +1,190 @@
+name: Post Publish Smoke
+
+on:
+  workflow_run:
+    workflows: ["Publish"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version to verify"
+        required: true
+        type: string
+      index:
+        description: "Package index to install from"
+        required: false
+        default: pypi
+        type: choice
+        options:
+          - pypi
+          - testpypi
+      previous_version:
+        description: "Optional previous version override for upgrade smoke"
+        required: false
+        type: string
+
+jobs:
+  resolve-version:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      index: ${{ steps.resolve.outputs.index }}
+      previous_version: ${{ steps.resolve.outputs.previous_version }}
+      run_upgrade: ${{ steps.resolve.outputs.run_upgrade }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve target versions
+        id: resolve
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+            index="${{ inputs.index }}"
+            previous_version="${{ inputs.previous_version }}"
+          else
+            version="$(python tools/release_helpers.py version)"
+            index="pypi"
+            previous_version=""
+          fi
+
+          run_upgrade="false"
+          if [[ -z "$previous_version" && "$index" == "pypi" ]]; then
+            previous_version="$(python tools/release_helpers.py previous-final-version --current-version "$version")"
+            run_upgrade="true"
+          elif [[ -n "$previous_version" ]]; then
+            run_upgrade="true"
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "index=$index" >> "$GITHUB_OUTPUT"
+          echo "previous_version=$previous_version" >> "$GITHUB_OUTPUT"
+          echo "run_upgrade=$run_upgrade" >> "$GITHUB_OUTPUT"
+
+      - name: Write resolution summary
+        run: |
+          previous_version="${{ steps.resolve.outputs.previous_version }}"
+          if [[ -z "$previous_version" ]]; then
+            previous_version="n/a"
+          fi
+          {
+            echo "## Post Publish Smoke Target"
+            echo ""
+            echo "- Version: \`${{ steps.resolve.outputs.version }}\`"
+            echo "- Index: \`${{ steps.resolve.outputs.index }}\`"
+            echo "- Previous version: \`$previous_version\`"
+            echo "- Upgrade smoke: \`${{ steps.resolve.outputs.run_upgrade }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  cleanroom-wheel-smoke:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Run wheel clean-room smoke
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if bash tools/cleanroom/run_registry_smoke.sh \
+              --index "${{ needs.resolve-version.outputs.index }}" \
+              --version "${{ needs.resolve-version.outputs.version }}" \
+              --install-mode wheel; then
+              break
+            fi
+            if [[ "$attempt" == "5" ]]; then
+              exit 1
+            fi
+            sleep 30
+          done
+
+      - name: Write wheel smoke summary
+        if: always()
+        run: |
+          {
+            echo "## Clean-Room Wheel Smoke"
+            echo ""
+            echo "- Version: \`${{ needs.resolve-version.outputs.version }}\`"
+            echo "- Index: \`${{ needs.resolve-version.outputs.index }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  cleanroom-sdist-smoke:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Run source-install clean-room smoke
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if bash tools/cleanroom/run_registry_smoke.sh \
+              --index "${{ needs.resolve-version.outputs.index }}" \
+              --version "${{ needs.resolve-version.outputs.version }}" \
+              --install-mode sdist; then
+              break
+            fi
+            if [[ "$attempt" == "5" ]]; then
+              exit 1
+            fi
+            sleep 30
+          done
+
+      - name: Write source smoke summary
+        if: always()
+        run: |
+          {
+            echo "## Clean-Room Source Smoke"
+            echo ""
+            echo "- Version: \`${{ needs.resolve-version.outputs.version }}\`"
+            echo "- Index: \`${{ needs.resolve-version.outputs.index }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  upgrade-smoke:
+    if: ${{ needs.resolve-version.outputs.run_upgrade == 'true' }}
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Run upgrade clean-room smoke
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if bash tools/cleanroom/run_registry_smoke.sh \
+              --index "${{ needs.resolve-version.outputs.index }}" \
+              --version "${{ needs.resolve-version.outputs.version }}" \
+              --install-mode upgrade \
+              --previous-version "${{ needs.resolve-version.outputs.previous_version }}"; then
+              break
+            fi
+            if [[ "$attempt" == "5" ]]; then
+              exit 1
+            fi
+            sleep 30
+          done
+
+      - name: Write upgrade smoke summary
+        if: always()
+        run: |
+          {
+            echo "## Clean-Room Upgrade Smoke"
+            echo ""
+            echo "- Previous version: \`${{ needs.resolve-version.outputs.previous_version }}\`"
+            echo "- Target version: \`${{ needs.resolve-version.outputs.version }}\`"
+            echo "- Index: \`${{ needs.resolve-version.outputs.index }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

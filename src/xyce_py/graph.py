@@ -20,6 +20,12 @@ def _validate_non_empty_string(value: object, field_name: str) -> str:
     return value
 
 
+def _validate_user_node_id(node_id: Hashable) -> Hashable:
+    if isinstance(node_id, str) and node_id.startswith(("_DEV_", "_INT_")):
+        raise ValueError("node_id cannot start with reserved prefixes '_DEV_' or '_INT_'.")
+    return node_id
+
+
 class CircuitTopologyError(RuntimeError):
     pass
 
@@ -40,6 +46,7 @@ class CircuitGraph:
     def add_node(self, node_id: Hashable, is_ground: bool = False):
         if not isinstance(node_id, Hashable):
             raise TypeError("node_id must be hashable.")
+        node_id = _validate_user_node_id(node_id)
 
         if node_id not in self.G:
             self.G.add_node(node_id)
@@ -107,7 +114,7 @@ class CircuitGraph:
         self.global_directives.append(directive)
 
     def add_subcircuit(self, subckt_string: str):
-        directive = _validate_non_empty_string(subckt_string, "subckt_string")
+        directive = _validate_non_empty_string(subckt_string, "subckt_string").strip()
         if not directive.startswith(".SUBCKT"):
             raise ValueError("subckt_string must start with '.SUBCKT'.")
         if not directive.endswith(".ENDS"):

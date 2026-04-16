@@ -54,6 +54,8 @@ def _execute_xyce_netlist(
 
     netlist_path = run_dir / "circuit.cir"
     netlist_path.write_text(netlist_content)
+    csv_path = run_dir / csv_name
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     solve_start = time.perf_counter()
     p = subprocess.run(
@@ -77,16 +79,15 @@ def _execute_xyce_netlist(
             stderr=p.stderr,
             run_dir=run_dir,
             netlist_path=netlist_path,
-            csv_path=run_dir / csv_name,
+            csv_path=csv_path,
             solve_time_sec=solve_time_sec,
         )
 
-    waveforms = _read_waveforms(run_dir / csv_name)
+    waveforms = _read_waveforms(csv_path)
 
     if not keep_run_dir:
-        artifacts = ["circuit.cir", csv_name, f"{Path(csv_name).stem}.prn"]
-        for art in artifacts:
-            file_to_rem = run_dir / art
+        artifacts = [netlist_path, csv_path, csv_path.with_suffix(".prn")]
+        for file_to_rem in artifacts:
             if file_to_rem.exists():
                 file_to_rem.unlink()
 
