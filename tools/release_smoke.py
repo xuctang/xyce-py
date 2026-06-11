@@ -14,13 +14,13 @@ EXPECTED_EXPORTS = {
 }
 
 
-def build_compile_only_netlist(xyce_py_module) -> str:
-    graph = xyce_py_module.CircuitGraph(xyce_path="Xyce")
-    graph.add_node("gnd", is_ground=True)
-    graph.add_branch("vin", "gnd", [xyce_py_module.VoltageSource("supply", 5.0)])
-    graph.add_branch("vin", "vout", [xyce_py_module.Resistor("r1", 1000)])
-    graph.add_branch("vout", "gnd", [xyce_py_module.Resistor("r2", 1000)])
-    return xyce_py_module.NetlistCompiler(graph.G, graph.global_directives).compile()
+def build_compile_only_netlist(package_module) -> str:
+    circuit = package_module.CircuitGraph(xyce_path="Xyce")
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_branch("vin", "gnd", [package_module.VoltageSource("supply", 5.0)])
+    circuit.add_branch("vin", "vout", [package_module.Resistor("r1", 1000)])
+    circuit.add_branch("vout", "gnd", [package_module.Resistor("r2", 1000)])
+    return package_module.NetlistCompiler(circuit.G, circuit.global_directives).compile()
 
 
 def run_smoke(expect_version: str | None = None) -> dict[str, object]:
@@ -71,12 +71,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        result = run_smoke(expect_version=args.expect_version)
+        smoke_result = run_smoke(expect_version=args.expect_version)
     except Exception as exc:  # pragma: no cover - exercised through subprocess tests
         print(f"release smoke failed: {exc}", file=sys.stderr)
         return 1
 
-    print(json.dumps(result, sort_keys=True))
+    print(json.dumps(smoke_result, sort_keys=True))
     return 0
 
 

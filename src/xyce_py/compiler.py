@@ -36,32 +36,32 @@ class NetlistCompiler:
 
     def _compile_element_lines(self) -> list[str]:
         spice_lines: list[str] = []
-        for u, v, key, data in self.graph.edges(keys=True, data=True):
-            if data.get("is_device_link") is True:
-                self.expanded_graph.add_edge(u, v, key=key, **data.copy())
+        for source_node, target_node, edge_key, edge_data in self.graph.edges(keys=True, data=True):
+            if edge_data.get("is_device_link") is True:
+                self.expanded_graph.add_edge(source_node, target_node, key=edge_key, **edge_data.copy())
                 continue
 
-            spice_u = self.node_map_forward[u]
-            spice_v = self.node_map_forward[v]
-            elements = data["elements"]
+            source_spice_node = self.node_map_forward[source_node]
+            target_spice_node = self.node_map_forward[target_node]
+            elements = edge_data["elements"]
 
             if len(elements) == 1:
-                spice_lines.append(elements[0].to_spice(spice_u, spice_v))
-                self.expanded_graph.add_edge(u, v, key=key, **data.copy())
+                spice_lines.append(elements[0].to_spice(source_spice_node, target_spice_node))
+                self.expanded_graph.add_edge(source_node, target_node, key=edge_key, **edge_data.copy())
                 continue
 
-            branch_nodes = [u]
+            expanded_branch_nodes = [source_node]
 
             for step_index in range(1, len(elements)):
-                hidden_node = f"_INT_{spice_u}_{spice_v}_{key}_step{step_index}"
-                branch_nodes.append(hidden_node)
+                hidden_node = f"_INT_{source_spice_node}_{target_spice_node}_{edge_key}_step{step_index}"
+                expanded_branch_nodes.append(hidden_node)
                 self.expanded_graph.add_node(hidden_node, is_hidden=True)
 
-            branch_nodes.append(v)
+            expanded_branch_nodes.append(target_node)
 
             for index, element in enumerate(elements):
-                start_node = branch_nodes[index]
-                end_node = branch_nodes[index + 1]
+                start_node = expanded_branch_nodes[index]
+                end_node = expanded_branch_nodes[index + 1]
                 spice_start = (
                     start_node
                     if isinstance(start_node, str) and start_node.startswith("_INT_")
@@ -83,12 +83,12 @@ class NetlistCompiler:
             if data.get("is_device") is not True:
                 continue
 
-            device_obj = data["device_obj"]
-            ordered_nodes = data["ordered_nodes"]
-            # ordered_nodes are user graph node ids, so this mapping preserves the
-            # ground remap to SPICE node "0" for device terminals automatically.
-            mapped_nodes = [self.node_map_forward[node_id] for node_id in ordered_nodes]
-            spice_lines.append(device_obj.to_spice(mapped_nodes))
+            device = data["device_obj"]
+            terminal_nodes = data["ordered_nodes"]
+            # Terminal node ids are user graph nodes, so this mapping preserves
+            # the ground remap to SPICE node "0" for device terminals automatically.
+            spice_terminal_nodes = [self.node_map_forward[node_id] for node_id in terminal_nodes]
+            spice_lines.append(device.to_spice(spice_terminal_nodes))
 
         return spice_lines
 

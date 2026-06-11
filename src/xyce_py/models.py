@@ -254,14 +254,16 @@ class SolveResult:
     node_map_inverse: dict[str, Hashable]
 
     def translated_waveforms(self) -> pd.DataFrame:
-        translated = self.waveforms.copy()
-        translated.columns = [self._translated_column_name(column) for column in translated.columns]
-        return translated
+        translated_waveforms = self.waveforms.copy()
+        translated_waveforms.columns = [
+            self._translated_column_name(column) for column in translated_waveforms.columns
+        ]
+        return translated_waveforms
 
     def _translated_column_name(self, column: object) -> object:
         if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
             return column
-        spice_id = column[2:-1]
-        if spice_id not in self.node_map_inverse:
+        spice_node = column[2:-1]
+        if spice_node not in self.node_map_inverse:
             return column
-        return f"V({self.node_map_inverse[spice_id]})"
+        return f"V({self.node_map_inverse[spice_node]})"

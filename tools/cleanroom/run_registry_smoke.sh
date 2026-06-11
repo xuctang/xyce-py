@@ -11,7 +11,7 @@ EOF
 }
 
 index_name=""
-version=""
+target_version=""
 install_mode=""
 previous_version=""
 
@@ -22,7 +22,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --version)
-      version="$2"
+      target_version="$2"
       shift 2
       ;;
     --install-mode)
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$index_name" || -z "$version" || -z "$install_mode" ]]; then
+if [[ -z "$index_name" || -z "$target_version" || -z "$install_mode" ]]; then
   echo "--index, --version, and --install-mode are required." >&2
   usage >&2
   exit 2
@@ -84,7 +84,7 @@ docker build -f "$script_dir/Dockerfile" -t "$image_name" "$repo_root"
 docker run \
   --rm \
   -e INDEX_NAME="$index_name" \
-  -e TARGET_VERSION="$version" \
+  -e TARGET_VERSION="$target_version" \
   -e INSTALL_MODE="$install_mode" \
   -e PREVIOUS_VERSION="$previous_version" \
   "$image_name" \

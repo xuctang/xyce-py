@@ -245,17 +245,17 @@ class CircuitGraph:
         )
 
     def _validate_topology(self):
-        ground_nodes = [
+        ground_node_ids = [
             node_id for node_id, data in self.G.nodes(data=True) if data.get("is_ground") is True
         ]
-        if not ground_nodes:
+        if not ground_node_ids:
             raise CircuitTopologyError("Circuit has no ground reference.")
-        if len(ground_nodes) > 1:
+        if len(ground_node_ids) > 1:
             raise CircuitTopologyError("Circuit has multiple ground references.")
 
-        ground_node = ground_nodes[0]
-        for component in nx.weakly_connected_components(self.G):
-            if ground_node not in component:
+        ground_node_id = ground_node_ids[0]
+        for component_nodes in nx.weakly_connected_components(self.G):
+            if ground_node_id not in component_nodes:
                 raise CircuitTopologyError("Floating subgraph detected with no path to ground.")
 
     def _find_ground_node(self):
@@ -267,13 +267,15 @@ class CircuitGraph:
     def _resolve_print_vars(
         self,
         print_vars: list[str] | None,
-        node_map_forward: dict[object, str],
+        user_to_spice_node: dict[object, str],
     ) -> list[str]:
         if print_vars is None:
-            resolved = [f"V({spice_id})" for spice_id in node_map_forward.values() if spice_id != "0"]
-            if not resolved:
+            default_print_vars = [
+                f"V({spice_node})" for spice_node in user_to_spice_node.values() if spice_node != "0"
+            ]
+            if not default_print_vars:
                 raise ValueError("No non-ground user nodes available for default print_vars.")
-            return resolved
+            return default_print_vars
 
         if not isinstance(print_vars, list) or not print_vars:
             raise ValueError("print_vars must be a non-empty list of strings.")
@@ -282,20 +284,20 @@ class CircuitGraph:
     def _normalize_simulation_request(
         self,
         analysis_cmd: str,
-        args: tuple[object, ...],
+        legacy_args: tuple[object, ...],
         print_vars: list[str] | None,
     ) -> tuple[str, str, list[str] | None]:
-        if args:
-            if len(args) > 2:
+        if legacy_args:
+            if len(legacy_args) > 2:
                 raise TypeError("simulate() accepts at most two deprecated positional arguments.")
             legacy_analysis_type = _validate_non_empty_string(analysis_cmd, "analysis_type").upper()
-            resolved_analysis_cmd = _validate_non_empty_string(args[0], "analysis_cmd").strip()
+            resolved_analysis_cmd = _validate_non_empty_string(legacy_args[0], "analysis_cmd").strip()
             if not resolved_analysis_cmd.upper().startswith(f".{legacy_analysis_type}"):
                 raise ValueError(f"analysis_cmd must start with '.{legacy_analysis_type}'.")
-            if len(args) == 2:
+            if len(legacy_args) == 2:
                 if print_vars is not None:
                     raise TypeError("print_vars must be passed once.")
-                print_vars = args[1]
+                print_vars = legacy_args[1]
             warnings.warn(
                 "simulate(analysis_type, analysis_cmd, ...) is deprecated; "
                 "use simulate(analysis_cmd, ...) instead.",
@@ -309,29 +311,29 @@ class CircuitGraph:
         return analysis_type, resolved_analysis_cmd, print_vars
 
     def _infer_analysis_type(self, analysis_cmd: str) -> str:
-        first_token = analysis_cmd.split(maxsplit=1)[0].upper()
-        if not first_token.startswith("."):
+        directive_token = analysis_cmd.split(maxsplit=1)[0].upper()
+        if not directive_token.startswith("."):
             raise ValueError("analysis_cmd must start with a SPICE analysis directive like '.OP'.")
-        analysis_type = first_token[1:]
+        analysis_type = directive_token[1:]
         if analysis_type not in {"OP", "TRAN", "AC", "DC"}:
             raise ValueError("analysis_cmd must start with one of: .OP, .TRAN, .AC, .DC.")
         return analysis_type
 
-    def _apply_inplace_solution(self, waveforms, node_map_inverse: dict[str, object]):
-        solved_values: dict[object, object] = {}
-        row = waveforms.iloc[0]
-        for column, value in row.items():
+    def _apply_inplace_solution(self, waveforms, spice_to_user_node: dict[str, object]):
+        node_voltage_updates: dict[object, object] = {}
+        solution_row = waveforms.iloc[0]
+        for column, value in solution_row.items():
             if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
                 continue
             spice_id = column[2:-1]
-            if spice_id == "0" or spice_id not in node_map_inverse:
+            if spice_id == "0" or spice_id not in spice_to_user_node:
                 continue
-            original_id = node_map_inverse[spice_id]
-            if "solved_voltage" in self.G.nodes[original_id]:
+            user_node_id = spice_to_user_node[spice_id]
+            if "solved_voltage" in self.G.nodes[user_node_id]:
                 raise RuntimeError(
                     "Attribute 'solved_voltage' already exists on node. Use inplace=False."
                 )
-            solved_values[original_id] = value
+            node_voltage_updates[user_node_id] = value
 
-        for original_id, value in solved_values.items():
-            self.G.nodes[original_id]["solved_voltage"] = value
+        for user_node_id, value in node_voltage_updates.items():
+            self.G.nodes[user_node_id]["solved_voltage"] = value

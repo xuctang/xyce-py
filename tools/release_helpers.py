@@ -20,8 +20,8 @@ PACKAGE_INDEX_URLS = {
 
 
 def read_version(pyproject_path: Path) -> str:
-    contents = pyproject_path.read_text(encoding="utf-8")
-    match = VERSION_LINE_RE.search(contents)
+    pyproject_text = pyproject_path.read_text(encoding="utf-8")
+    match = VERSION_LINE_RE.search(pyproject_text)
     if match is None:
         raise SystemExit(f"Could not find a project version in {pyproject_path}.")
     return match.group(1)
@@ -51,17 +51,17 @@ def parse_final_version(version: str) -> tuple[int, int, int]:
 
 
 def select_previous_final_version(current_version: str, versions: list[str]) -> str:
-    current = parse_final_version(current_version)
-    candidates = []
+    current_version_parts = parse_final_version(current_version)
+    previous_final_candidates = []
     for version in versions:
         if not FINAL_VERSION_RE.fullmatch(version):
             continue
-        parsed = parse_final_version(version)
-        if parsed < current:
-            candidates.append((parsed, version))
-    if not candidates:
+        version_parts = parse_final_version(version)
+        if version_parts < current_version_parts:
+            previous_final_candidates.append((version_parts, version))
+    if not previous_final_candidates:
         raise SystemExit(f"No previous final release exists before {current_version!r}.")
-    return max(candidates)[1]
+    return max(previous_final_candidates)[1]
 
 
 def fetch_release_versions(package_name: str, index: str) -> list[str]:
@@ -70,28 +70,28 @@ def fetch_release_versions(package_name: str, index: str) -> list[str]:
     url = PACKAGE_INDEX_URLS[index].format(package_name=package_name)
     try:
         with urlopen(url, timeout=30) as response:
-            payload = json.load(response)
+            metadata_payload = json.load(response)
     except HTTPError as exc:
         raise SystemExit(f"Failed to fetch release metadata from {url}: HTTP {exc.code}.") from exc
     except URLError as exc:
         raise SystemExit(f"Failed to fetch release metadata from {url}: {exc.reason}.") from exc
-    releases = payload.get("releases")
-    if not isinstance(releases, dict):
+    release_map = metadata_payload.get("releases")
+    if not isinstance(release_map, dict):
         raise SystemExit(f"Release metadata from {url} did not contain a 'releases' mapping.")
-    return sorted(releases)
+    return sorted(release_map)
 
 
 def find_dist_path(dist_dir: Path, pattern: str) -> Path:
-    matches = sorted(dist_dir.glob(pattern))
-    if len(matches) != 1:
+    artifact_paths = sorted(dist_dir.glob(pattern))
+    if len(artifact_paths) != 1:
         raise SystemExit(
-            f"Expected exactly one artifact matching {pattern!r} in {dist_dir}, found {len(matches)}."
+            f"Expected exactly one artifact matching {pattern!r} in {dist_dir}, found {len(artifact_paths)}."
         )
-    return matches[0]
+    return artifact_paths[0]
 
 
 def find_site_packages_path(python_executable: Path) -> str:
-    result = subprocess.run(
+    completed_process = subprocess.run(
         [
             str(python_executable),
             "-c",
@@ -101,7 +101,7 @@ def find_site_packages_path(python_executable: Path) -> str:
         capture_output=True,
         text=True,
     )
-    return result.stdout.strip()
+    return completed_process.stdout.strip()
 
 
 def build_parser() -> argparse.ArgumentParser:
