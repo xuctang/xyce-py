@@ -255,14 +255,13 @@ class SolveResult:
 
     def translated_waveforms(self) -> pd.DataFrame:
         translated = self.waveforms.copy()
-        renamed_columns: dict[str, str] = {}
+        translated.columns = [self._translated_column_name(column) for column in translated.columns]
+        return translated
 
-        for column in translated.columns:
-            if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
-                continue
-            spice_id = column[2:-1]
-            if spice_id not in self.node_map_inverse:
-                continue
-            renamed_columns[column] = f"V({self.node_map_inverse[spice_id]})"
-
-        return translated.rename(columns=renamed_columns)
+    def _translated_column_name(self, column: object) -> object:
+        if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
+            return column
+        spice_id = column[2:-1]
+        if spice_id not in self.node_map_inverse:
+            return column
+        return f"V({self.node_map_inverse[spice_id]})"

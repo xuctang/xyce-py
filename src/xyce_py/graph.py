@@ -137,7 +137,6 @@ class CircuitGraph:
             print_vars,
         )
 
-        original_graph = self.G.copy()
         self._validate_topology()
         compiler = NetlistCompiler(self.G, self.global_directives)
         netlist_lines = compiler._compile_body_lines()
@@ -162,7 +161,11 @@ class CircuitGraph:
             keep_run_dir=False,
         )
 
-        expanded_graph = compiler.expanded_graph.copy()
+        if compiler.expanded_graph is None:
+            raise RuntimeError("Compiler did not produce an expanded graph.")
+
+        original_graph = self.G.copy()
+        expanded_graph = compiler.expanded_graph
         waveforms = execution_result.waveforms
         if inplace:
             if len(waveforms) != 1:
@@ -251,11 +254,9 @@ class CircuitGraph:
             raise CircuitTopologyError("Circuit has multiple ground references.")
 
         ground_node = ground_nodes[0]
-        components = list(nx.weakly_connected_components(self.G))
-        if len(components) > 1:
-            for component in components:
-                if ground_node not in component:
-                    raise CircuitTopologyError("Floating subgraph detected with no path to ground.")
+        for component in nx.weakly_connected_components(self.G):
+            if ground_node not in component:
+                raise CircuitTopologyError("Floating subgraph detected with no path to ground.")
 
     def _find_ground_node(self):
         for node_id, data in self.G.nodes(data=True):

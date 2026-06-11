@@ -19,7 +19,11 @@ class NetlistCompiler:
     def _compile_body_lines(self) -> list[str]:
         self.node_map_forward = {}
         self.node_map_inverse = {}
-        self.expanded_graph = self.graph.copy()
+        self.expanded_graph = self.graph.__class__()
+        self.expanded_graph.graph.update(self.graph.graph)
+        self.expanded_graph.add_nodes_from(
+            (node_id, data.copy()) for node_id, data in self.graph.nodes(data=True)
+        )
 
         self._build_node_maps()
 
@@ -34,6 +38,7 @@ class NetlistCompiler:
         spice_lines: list[str] = []
         for u, v, key, data in self.graph.edges(keys=True, data=True):
             if data.get("is_device_link") is True:
+                self.expanded_graph.add_edge(u, v, key=key, **data.copy())
                 continue
 
             spice_u = self.node_map_forward[u]
@@ -42,9 +47,9 @@ class NetlistCompiler:
 
             if len(elements) == 1:
                 spice_lines.append(elements[0].to_spice(spice_u, spice_v))
+                self.expanded_graph.add_edge(u, v, key=key, **data.copy())
                 continue
 
-            self.expanded_graph.remove_edge(u, v, key=key)
             branch_nodes = [u]
 
             for step_index in range(1, len(elements)):

@@ -135,3 +135,17 @@ def test_compile_node_maps_are_stable_across_repeated_calls():
 
     assert compiler.node_map_forward == first_forward
     assert compiler.node_map_inverse == first_inverse
+
+
+def test_compile_expanded_graph_preserves_source_graph_metadata():
+    circuit = _build_series_circuit(1)
+    circuit.G.graph["source"] = "unit-test"
+    circuit.G.nodes["n1"]["label"] = "input"
+    circuit.G.edges["n1", "gnd", 0]["tag"] = "load"
+    compiler = NetlistCompiler(circuit.G, [])
+
+    compiler.compile()
+
+    assert compiler.expanded_graph.graph["source"] == "unit-test"
+    assert compiler.expanded_graph.nodes["n1"]["label"] == "input"
+    assert compiler.expanded_graph.edges["n1", "gnd", 0]["tag"] == "load"

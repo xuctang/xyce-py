@@ -49,13 +49,17 @@ def _execute_xyce_netlist(
     if target_dir:
         run_dir = Path(target_dir)
     else:
-        run_dir = Path(base_out_dir).resolve() / run_name
+        base_path = Path(base_out_dir)
+        if not base_path.is_absolute():
+            base_path = base_path.resolve()
+        run_dir = base_path / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
 
     netlist_path = run_dir / "circuit.cir"
     netlist_path.write_text(netlist_content)
     csv_path = run_dir / csv_name
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    if csv_path.parent != run_dir:
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     solve_start = time.perf_counter()
     p = subprocess.run(
@@ -88,8 +92,7 @@ def _execute_xyce_netlist(
     if not keep_run_dir:
         artifacts = [netlist_path, csv_path, csv_path.with_suffix(".prn")]
         for file_to_rem in artifacts:
-            if file_to_rem.exists():
-                file_to_rem.unlink()
+            file_to_rem.unlink(missing_ok=True)
 
     return _XyceExecutionResult(run_dir, netlist_path, p.stdout, p.stderr, waveforms, solve_time_sec)
 

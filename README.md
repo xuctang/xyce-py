@@ -1,12 +1,39 @@
 # xyce-py
 
-`xyce-py` is a NetworkX-driven Python wrapper for building circuit topologies, compiling Xyce netlists, and working with simulation results from the Sandia Xyce engine.
+`xyce-py` is a small Python interface for building circuit topologies, compiling
+them into Xyce-compatible netlists, running the Sandia Xyce simulator, and reading
+simulation output back into Pandas.
+
+The package does not replace Xyce. Xyce remains the simulation engine. `xyce-py`
+handles the Python-side work around it: graph construction, SPICE netlist
+generation, process execution, result loading, and node-name translation.
+
+## What It Provides
+
+- A `CircuitGraph` API for building circuits from named nodes, branches, and
+  multi-terminal devices.
+- Built-in models for common elements: resistors, capacitors, inductors, voltage
+  sources, current sources, diodes, BJTs, MOSFETs, behavioral sources, and
+  subcircuit instances.
+- A `NetlistCompiler` that converts the graph into a Xyce/SPICE-style netlist.
+- Simulation helpers for operating point, transient, AC, and DC analyses.
+- Pandas `DataFrame` output for waveforms, plus helpers to translate generated
+  SPICE node names back to user node names.
+- Fail-fast validation for invalid Python-side inputs and disconnected topologies
+  before Xyce is launched.
+
+## Requirements
+
+- Python 3.10 or newer.
+- Sandia Xyce installed separately and available either at
+  `/usr/local/XyceNF_7.10/bin/Xyce` or on your `PATH` as `Xyce`.
+
+Xyce is not bundled with this package. Install it from Sandia National
+Laboratories before running simulations.
 
 ## Installation
 
-**Note:** `xyce-py` requires the Sandia National Laboratories Xyce engine to be installed on your system. It is not bundled with this Python package. Download and install Xyce from Sandia's official site before using this tool.
-
-Install the Python package from PyPI:
+From PyPI:
 
 ```bash
 pip install xyce-py
@@ -23,6 +50,9 @@ python -m pip install -e '.[test]'
 
 ## Quick Start
 
+This example builds a voltage divider and compiles it to a netlist. It does not
+run Xyce.
+
 ```python
 from xyce_py import CircuitGraph, NetlistCompiler, Resistor, VoltageSource
 
@@ -36,7 +66,20 @@ netlist = NetlistCompiler(graph.G, graph.global_directives).compile()
 print(netlist)
 ```
 
+Generated netlist:
+
+```spice
+* Generated Circuit
+.OPTIONS DEVICE GMIN=1e-8
+V_supply N_1 0 DC 5.0
+R_r1 N_1 N_2 1000.0
+R_r2 N_2 0 1000.0
+.END
+```
+
 ## Run with Xyce
+
+Use `CircuitGraph.simulate_op()` when Xyce is installed and available.
 
 ```python
 from tempfile import TemporaryDirectory
@@ -54,49 +97,78 @@ with TemporaryDirectory() as tmpdir:
     print(result.translated_waveforms())
 ```
 
-## Xyce Discovery
+`result.waveforms` contains Xyce's generated column names, such as `V(N_1)`.
+`result.translated_waveforms()` returns a copy with voltage columns translated
+back to the original user node names, such as `V(vin)` and `V(vout)`.
 
-`xyce-py` looks for the Xyce executable in this order:
+## Supported Analysis Helpers
 
-1. `/usr/local/XyceNF_7.10/bin/Xyce`
-2. `Xyce` on your system `PATH`
+```python
+result = graph.simulate_op()
+result = graph.simulate_transient("1u", "20u")
+result = graph.simulate_ac("DEC", "10", "1", "1e6")
+result = graph.simulate_dc("V_supply", "0", "5", "0.5")
+```
 
-You can also pass `xyce_path=` directly when constructing `CircuitGraph`.
+You can also call `graph.simulate(".OP")`, `graph.simulate(".TRAN ...")`,
+`graph.simulate(".AC ...")`, or `graph.simulate(".DC ...")` directly.
 
-## Testing
+## Models, Options, and Subcircuits
 
-After installing the package into your virtual environment, run:
+Raw Xyce directives can be attached to the graph when needed:
+
+```python
+graph.add_model(".MODEL DFAST D(IS=1e-9)")
+graph.add_options(".OPTIONS DEVICE GMIN=1e-9")
+graph.add_subcircuit(".SUBCKT BUF IN OUT\nR1 OUT IN 1k\n.ENDS")
+```
+
+Subcircuit definitions are passed through as opaque SPICE text. Xyce validates
+subcircuit internals and arity during simulation.
+
+## Error Handling
+
+`xyce-py` validates Python-side contracts early:
+
+- Node identifiers must be hashable.
+- Each graph may have only one ground node.
+- Branches must contain at least one `CircuitElement`.
+- Device terminal counts must match the device type.
+- Floating subgraphs are rejected before launching Xyce.
+
+If Xyce exits with a non-zero status, `xyce-py` raises `XyceRunError` with the
+return code, stdout, stderr, run directory, netlist path, CSV path, and elapsed
+solve time.
+
+## Development and Testing
+
+Install test dependencies:
 
 ```bash
 python -m pip install -e '.[test]'
+```
+
+Run the full test suite:
+
+```bash
 pytest
 ```
 
-The suite is organized into `tests/unit`, `tests/integration`, `tests/property`, and
-`tests/packaging`. Real-Xyce tests are marked with `@pytest.mark.xyce`.
+Real-Xyce tests are marked with `@pytest.mark.xyce` and are skipped only when
+Xyce is unavailable.
 
 ## Packaging
 
-Build the source distribution and wheel with:
+Build the source distribution and wheel:
 
 ```bash
 python -m build
 ```
 
-Validate the built metadata with:
+Validate the built metadata:
 
 ```bash
 python -m twine check dist/*
 ```
 
-## Release Candidates
-
-Release candidate builds use prerelease versions such as `1.0.1rc1` and publish to
-TestPyPI first. Each release candidate must pass both the Linux and macOS self-hosted
-Xyce release gates before a final release is cut.
-
-Final releases use versions such as `1.0.1` and publish to PyPI only after a
-successful TestPyPI rehearsal for the same release line, including the real-Xyce
-Linux and macOS gates, registry-backed install smoke checks, and dependency audit.
-
-See `docs/release.md` for the full release operator checklist.
+See `docs/release.md` for the release checklist used before publishing.

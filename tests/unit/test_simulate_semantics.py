@@ -185,6 +185,19 @@ def test_simulate_returns_original_graph_snapshot_before_inplace_updates(
     assert circuit.G.nodes["vin"]["solved_voltage"] == 10.0
 
 
+def test_simulate_returns_expanded_graph_independent_from_circuit_graph(
+    build_voltage_divider,
+    stub_xyce_execution,
+):
+    stub_xyce_execution()
+    circuit = build_voltage_divider()
+
+    result = circuit.simulate(".OP")
+    result.expanded_graph.add_node("result_only")
+
+    assert "result_only" not in circuit.G
+
+
 def test_simulate_returns_copied_node_map_inverse(monkeypatch, build_voltage_divider, stub_xyce_execution):
     class TrackingCompiler(graph_module.NetlistCompiler):
         last_instance = None
