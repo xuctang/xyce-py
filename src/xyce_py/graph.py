@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Hashable
+from collections.abc import Hashable, Mapping
 from pathlib import Path
 import time
 import warnings
@@ -9,7 +9,7 @@ import networkx as nx
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
 from .compiler import NetlistCompiler
-from .engine import _execute_xyce_netlist, find_xyce_executable
+from .engine import execute_xyce_netlist, find_xyce_executable
 from .models import CircuitElement, NTerminalDevice, SolveResult
 
 
@@ -148,7 +148,7 @@ class CircuitGraph:
         netlist_lines.append(".END")
         final_netlist = "\n".join(netlist_lines) + "\n"
 
-        execution_result = _execute_xyce_netlist(
+        execution_result = execute_xyce_netlist(
             xyce_path=self.xyce_path,
             base_out_dir=self.base_out_dir,
             netlist_content=final_netlist,
@@ -175,7 +175,7 @@ class CircuitGraph:
             waveforms=waveforms,
             solve_time_sec=execution_result.solve_time_sec,
             stdout=execution_result.stdout,
-            node_map_inverse=compiled_body.node_map_inverse.copy(),
+            node_map_inverse=dict(compiled_body.node_map_inverse),
         )
 
     def simulate_op(
@@ -312,7 +312,7 @@ class CircuitGraph:
             raise ValueError("analysis_cmd must start with one of: .OP, .TRAN, .AC, .DC.")
         return analysis_type
 
-    def _apply_inplace_solution(self, waveforms, spice_to_user_node: dict[str, object]):
+    def _apply_inplace_solution(self, waveforms, spice_to_user_node: Mapping[str, object]):
         node_voltage_updates: dict[object, object] = {}
         solution_row = waveforms.iloc[0]
         for column, value in solution_row.items():

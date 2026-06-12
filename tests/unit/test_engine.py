@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 import xyce_py.engine as engine
-from xyce_py.engine import XyceRunError, _execute_xyce_netlist, _read_waveforms, find_xyce_executable
+from xyce_py.engine import XyceRunError, execute_xyce_netlist, _read_waveforms, find_xyce_executable
 
 
 pytestmark = pytest.mark.unit
@@ -110,7 +110,7 @@ def test_execute_xyce_netlist_writes_netlist_and_returns_waveforms_stdout_and_st
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",
@@ -134,7 +134,7 @@ def test_execute_xyce_netlist_uses_target_dir_over_base_out_dir(monkeypatch, tmp
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path / "ignored",
         target_dir=target_dir,
@@ -157,7 +157,7 @@ def test_execute_xyce_netlist_supports_nested_csv_name_paths(monkeypatch, tmp_pa
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",
@@ -179,7 +179,7 @@ def test_execute_xyce_netlist_removes_artifacts_when_keep_run_dir_is_false(monke
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",
@@ -201,7 +201,7 @@ def test_execute_xyce_netlist_preserves_artifacts_when_keep_run_dir_is_true(monk
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",
@@ -223,7 +223,7 @@ def test_execute_xyce_netlist_raises_xyce_run_error_with_full_context_on_nonzero
     )
 
     with pytest.raises(XyceRunError) as exc_info:
-        _execute_xyce_netlist(
+        execute_xyce_netlist(
             xyce_path="Xyce",
             base_out_dir=tmp_path,
             netlist_content="* test\n.END\n",
@@ -252,7 +252,7 @@ def test_execute_xyce_netlist_bubbles_file_not_found_error(monkeypatch, tmp_path
     )
 
     with pytest.raises(FileNotFoundError, match="missing"):
-        _execute_xyce_netlist(
+        execute_xyce_netlist(
             xyce_path="Xyce",
             base_out_dir=tmp_path,
             netlist_content="* test\n.END\n",
@@ -268,7 +268,7 @@ def test_execute_xyce_netlist_bubbles_permission_error(monkeypatch, tmp_path):
     )
 
     with pytest.raises(PermissionError, match="denied"):
-        _execute_xyce_netlist(
+        execute_xyce_netlist(
             xyce_path="Xyce",
             base_out_dir=tmp_path,
             netlist_content="* test\n.END\n",
@@ -279,7 +279,7 @@ def test_execute_xyce_netlist_bubbles_permission_error(monkeypatch, tmp_path):
 def test_execute_xyce_netlist_returns_empty_waveforms_when_csv_is_missing_after_success(monkeypatch, tmp_path):
     monkeypatch.setattr(engine.subprocess, "run", lambda *args, **kwargs: _completed_process())
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",

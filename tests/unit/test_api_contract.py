@@ -35,7 +35,9 @@ def test___all___exports_resolve_to_expected_objects():
         "SolveResult": models.SolveResult,
         "Subcircuit": models.Subcircuit,
         "VoltageSource": models.VoltageSource,
+        "XyceExecutionResult": engine.XyceExecutionResult,
         "XyceRunError": engine.XyceRunError,
+        "execute_xyce_netlist": engine.execute_xyce_netlist,
         "find_xyce_executable": engine.find_xyce_executable,
     }
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 import shutil
 from pathlib import Path
@@ -26,8 +27,8 @@ def _read_waveforms(csv_path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@dataclass
-class _XyceExecutionResult:
+@dataclass(frozen=True)
+class XyceExecutionResult:
     run_dir: Path
     netlist_path: Path
     stdout: str
@@ -36,7 +37,7 @@ class _XyceExecutionResult:
     solve_time_sec: float
 
 
-def _execute_xyce_netlist(
+def execute_xyce_netlist(
     *,
     xyce_path: str,
     base_out_dir: Path | str,
@@ -45,7 +46,7 @@ def _execute_xyce_netlist(
     run_name: str = "run",
     target_dir: Optional[Path] = None,
     keep_run_dir: bool = False,
-) -> _XyceExecutionResult:
+) -> XyceExecutionResult:
     if target_dir:
         run_dir = Path(target_dir)
     else:
@@ -94,7 +95,7 @@ def _execute_xyce_netlist(
         for artifact_path in artifact_paths:
             artifact_path.unlink(missing_ok=True)
 
-    return _XyceExecutionResult(
+    return XyceExecutionResult(
         run_dir,
         netlist_path,
         completed_process.stdout,
@@ -102,6 +103,7 @@ def _execute_xyce_netlist(
         waveforms,
         solve_time_sec,
     )
+
 
 class XyceRunError(RuntimeError):
     def __init__(

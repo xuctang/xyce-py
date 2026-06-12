@@ -135,18 +135,42 @@ def test_compile_body_returns_public_compiler_result_without_end_line():
     assert ".END" not in compiled_body.lines
     assert compiled_body.node_map_forward == compiler.node_map_forward
     assert compiled_body.node_map_inverse == compiler.node_map_inverse
-    assert compiled_body.expanded_graph is compiler.expanded_graph
+    assert compiled_body.expanded_graph is not compiler.expanded_graph
 
 
-def test_compile_body_copies_node_maps_for_callers():
+def test_compile_body_exposes_read_only_node_maps():
     compiler = NetlistCompiler(_build_series_circuit(1).G, [])
 
     compiled_body = compiler.compile_body()
-    compiled_body.node_map_forward["n1"] = "changed"
-    compiled_body.node_map_inverse["N_1"] = "changed"
 
-    assert compiler.node_map_forward["n1"] == "N_1"
-    assert compiler.node_map_inverse["N_1"] == "n1"
+    with pytest.raises(TypeError):
+        compiled_body.node_map_forward["n1"] = "changed"
+    with pytest.raises(TypeError):
+        compiled_body.node_map_inverse["N_1"] = "changed"
+
+
+def test_compile_body_expanded_graph_is_independent_from_compiler_state():
+    compiler = NetlistCompiler(_build_series_circuit(1).G, [])
+
+    compiled_body = compiler.compile_body()
+    compiled_body.expanded_graph.add_node("body_only")
+
+    assert "body_only" not in compiler.expanded_graph
+
+
+def test_compiler_public_state_properties_are_defensive():
+    compiler = NetlistCompiler(_build_series_circuit(1).G, [])
+
+    compiler.compile()
+    with pytest.raises(TypeError):
+        compiler.node_map_forward["n1"] = "changed"
+    with pytest.raises(TypeError):
+        compiler.node_map_inverse["N_1"] = "changed"
+
+    expanded_graph = compiler.expanded_graph
+    expanded_graph.add_node("external_only")
+
+    assert "external_only" not in compiler.expanded_graph
 
 
 def test_compile_node_maps_are_stable_across_repeated_calls():

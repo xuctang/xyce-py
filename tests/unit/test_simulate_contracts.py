@@ -125,7 +125,7 @@ def test_xyce_execution_error_propagates_without_mutating_graph(monkeypatch, bui
     def _raise_error(**kwargs):
         raise XyceRunError("solver failed", returncode=1)
 
-    monkeypatch.setattr(graph_module, "_execute_xyce_netlist", _raise_error)
+    monkeypatch.setattr(graph_module, "execute_xyce_netlist", _raise_error)
     circuit = build_voltage_divider()
 
     with pytest.raises(XyceRunError, match="solver failed"):

@@ -8,7 +8,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 import xyce_py.engine as engine
-from xyce_py.engine import XyceRunError, _execute_xyce_netlist, _read_waveforms
+from xyce_py.engine import XyceRunError, execute_xyce_netlist, _read_waveforms
 
 
 pytestmark = pytest.mark.unit
@@ -35,7 +35,7 @@ def test_execute_xyce_netlist_invokes_subprocess_with_exact_contract(monkeypatch
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    _execute_xyce_netlist(
+    execute_xyce_netlist(
         xyce_path="/opt/Xyce/bin/Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",
@@ -61,7 +61,7 @@ def test_execute_xyce_netlist_resolves_relative_base_out_dir(monkeypatch, tmp_pa
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir="relative_runs",
         netlist_content="* test\n.END\n",
@@ -84,7 +84,7 @@ def test_execute_xyce_netlist_records_elapsed_subprocess_time(monkeypatch, tmp_p
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
     monkeypatch.setattr(engine.time, "perf_counter", lambda: next(times))
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",
@@ -103,7 +103,7 @@ def test_execute_xyce_netlist_does_not_read_waveforms_after_xyce_failure(monkeyp
     )
 
     with pytest.raises(XyceRunError):
-        _execute_xyce_netlist(
+        execute_xyce_netlist(
             xyce_path="Xyce",
             base_out_dir=tmp_path,
             netlist_content="* test\n.END\n",
@@ -120,7 +120,7 @@ def test_execute_xyce_netlist_preserves_failure_artifacts_even_when_cleanup_was_
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
     with pytest.raises(XyceRunError) as exc_info:
-        _execute_xyce_netlist(
+        execute_xyce_netlist(
             xyce_path="Xyce",
             base_out_dir=tmp_path,
             netlist_content="* test\n.END\n",
@@ -136,7 +136,7 @@ def test_execute_xyce_netlist_preserves_failure_artifacts_even_when_cleanup_was_
 def test_execute_xyce_netlist_cleanup_tolerates_missing_output_artifacts(monkeypatch, tmp_path):
     monkeypatch.setattr(engine.subprocess, "run", lambda *args, **kwargs: _completed_process())
 
-    result = _execute_xyce_netlist(
+    result = execute_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",

@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 import xyce_py.graph as graph_module
-from xyce_py.engine import _XyceExecutionResult, find_xyce_executable
+from xyce_py.engine import XyceExecutionResult, find_xyce_executable
 from xyce_py.graph import CircuitGraph
 from xyce_py.models import Capacitor, Resistor, VoltageSource
 
@@ -76,7 +76,7 @@ def stub_xyce_execution(monkeypatch):
         def _fake_execute_xyce_netlist(**kwargs):
             calls.append(kwargs)
             run_dir = Path(kwargs["base_out_dir"]) / kwargs["run_name"]
-            return _XyceExecutionResult(
+            return XyceExecutionResult(
                 run_dir=run_dir,
                 netlist_path=run_dir / "circuit.cir",
                 stdout=stdout,
@@ -85,7 +85,7 @@ def stub_xyce_execution(monkeypatch):
                 solve_time_sec=solve_time_sec,
             )
 
-        monkeypatch.setattr(graph_module, "_execute_xyce_netlist", _fake_execute_xyce_netlist)
+        monkeypatch.setattr(graph_module, "execute_xyce_netlist", _fake_execute_xyce_netlist)
         return calls
 
     return _install
