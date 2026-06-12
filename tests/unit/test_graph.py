@@ -202,7 +202,7 @@ def test_add_subcircuit_strips_outer_whitespace_before_validation():
 
     circuit.add_subcircuit("  .SUBCKT BUF IN OUT\nR1 OUT IN 1k\n.ENDS  ")
 
-    assert circuit.global_directives == [".SUBCKT BUF IN OUT\nR1 OUT IN 1k\n.ENDS"]
+    assert circuit.spice_directives == [".SUBCKT BUF IN OUT\nR1 OUT IN 1k\n.ENDS"]
 
 
 def test_add_subcircuit_rejects_invalid_directives():

@@ -35,19 +35,19 @@ def _hidden_nodes(graph) -> list[str]:
 
 def test_large_circuit_compile_is_stable_across_repeated_runs():
     circuit = _build_large_circuit()
-    compiler = NetlistCompiler(circuit.G, circuit.global_directives)
+    compiler = NetlistCompiler(circuit.G, circuit.spice_directives)
 
     baseline_netlist = compiler.compile()
-    baseline_forward = compiler.node_map_forward.copy()
-    baseline_inverse = compiler.node_map_inverse.copy()
+    baseline_user_to_spice_node = compiler.user_to_spice_node.copy()
+    baseline_spice_to_user_node = compiler.spice_to_user_node.copy()
     baseline_hidden_nodes = _hidden_nodes(compiler.expanded_graph)
     baseline_edge_count = len(list(compiler.expanded_graph.edges(keys=True)))
 
     for _ in range(3):
         netlist = compiler.compile()
         assert netlist == baseline_netlist
-        assert compiler.node_map_forward == baseline_forward
-        assert compiler.node_map_inverse == baseline_inverse
+        assert compiler.user_to_spice_node == baseline_user_to_spice_node
+        assert compiler.spice_to_user_node == baseline_spice_to_user_node
         assert _hidden_nodes(compiler.expanded_graph) == baseline_hidden_nodes
         assert len(list(compiler.expanded_graph.edges(keys=True))) == baseline_edge_count
 
@@ -71,7 +71,7 @@ def test_large_circuit_simulate_is_stable_and_does_not_leak_internal_state(stub_
     results = [circuit.simulate(".OP", print_vars=["V(N_1)", "V(N_2)", "V(N_3)"]) for _ in range(3)]
 
     assert all(result.netlist == results[0].netlist for result in results[1:])
-    assert all(result.node_map_inverse == results[0].node_map_inverse for result in results[1:])
+    assert all(result.spice_to_user_node == results[0].spice_to_user_node for result in results[1:])
     assert all(_hidden_nodes(result.expanded_graph) == _hidden_nodes(results[0].expanded_graph) for result in results[1:])
     assert len(circuit.G.nodes) == baseline_node_count
     assert len(circuit.G.edges) == baseline_edge_count

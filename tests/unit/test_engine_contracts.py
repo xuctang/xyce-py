@@ -8,7 +8,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 import xyce_py.engine as engine
-from xyce_py.engine import XyceRunError, execute_xyce_netlist, _read_waveforms
+from xyce_py.engine import XyceRunError, run_xyce_netlist, _read_waveforms
 
 
 pytestmark = pytest.mark.unit
@@ -18,7 +18,7 @@ def _completed_process(*, returncode: int = 0, stdout: str = "stdout", stderr: s
     return subprocess.CompletedProcess(args=["Xyce", "circuit.cir"], returncode=returncode, stdout=stdout, stderr=stderr)
 
 
-def test_execute_xyce_netlist_invokes_subprocess_with_exact_contract(monkeypatch, tmp_path):
+def test_run_xyce_netlist_invokes_subprocess_with_exact_contract(monkeypatch, tmp_path):
     captured: dict[str, object] = {}
 
     def _fake_run(args, cwd, capture_output, text):
@@ -35,7 +35,7 @@ def test_execute_xyce_netlist_invokes_subprocess_with_exact_contract(monkeypatch
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    execute_xyce_netlist(
+    run_xyce_netlist(
         xyce_path="/opt/Xyce/bin/Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",
@@ -52,7 +52,7 @@ def test_execute_xyce_netlist_invokes_subprocess_with_exact_contract(monkeypatch
     }
 
 
-def test_execute_xyce_netlist_resolves_relative_base_out_dir(monkeypatch, tmp_path):
+def test_run_xyce_netlist_resolves_relative_base_out_dir(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     def _fake_run(args, cwd, capture_output, text):
@@ -61,7 +61,7 @@ def test_execute_xyce_netlist_resolves_relative_base_out_dir(monkeypatch, tmp_pa
 
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
-    result = execute_xyce_netlist(
+    result = run_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir="relative_runs",
         netlist_content="* test\n.END\n",
@@ -74,7 +74,7 @@ def test_execute_xyce_netlist_resolves_relative_base_out_dir(monkeypatch, tmp_pa
     assert result.netlist_path == tmp_path / "relative_runs" / "run1" / "circuit.cir"
 
 
-def test_execute_xyce_netlist_records_elapsed_subprocess_time(monkeypatch, tmp_path):
+def test_run_xyce_netlist_records_elapsed_subprocess_time(monkeypatch, tmp_path):
     times = iter([100.0, 102.25])
 
     def _fake_run(args, cwd, capture_output, text):
@@ -84,7 +84,7 @@ def test_execute_xyce_netlist_records_elapsed_subprocess_time(monkeypatch, tmp_p
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
     monkeypatch.setattr(engine.time, "perf_counter", lambda: next(times))
 
-    result = execute_xyce_netlist(
+    result = run_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",
@@ -94,7 +94,7 @@ def test_execute_xyce_netlist_records_elapsed_subprocess_time(monkeypatch, tmp_p
     assert result.solve_time_sec == 2.25
 
 
-def test_execute_xyce_netlist_does_not_read_waveforms_after_xyce_failure(monkeypatch, tmp_path):
+def test_run_xyce_netlist_does_not_read_waveforms_after_xyce_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(engine.subprocess, "run", lambda *args, **kwargs: _completed_process(returncode=9))
     monkeypatch.setattr(
         engine,
@@ -103,7 +103,7 @@ def test_execute_xyce_netlist_does_not_read_waveforms_after_xyce_failure(monkeyp
     )
 
     with pytest.raises(XyceRunError):
-        execute_xyce_netlist(
+        run_xyce_netlist(
             xyce_path="Xyce",
             base_out_dir=tmp_path,
             netlist_content="* test\n.END\n",
@@ -112,7 +112,7 @@ def test_execute_xyce_netlist_does_not_read_waveforms_after_xyce_failure(monkeyp
         )
 
 
-def test_execute_xyce_netlist_preserves_failure_artifacts_even_when_cleanup_was_requested(monkeypatch, tmp_path):
+def test_run_xyce_netlist_preserves_failure_artifacts_even_when_cleanup_was_requested(monkeypatch, tmp_path):
     def _fake_run(args, cwd, capture_output, text):
         (Path(cwd) / "output.csv").write_text("TIME,V(N_1)\n0.0,1.0\n")
         return _completed_process(returncode=2, stdout="bad netlist", stderr="details")
@@ -120,7 +120,7 @@ def test_execute_xyce_netlist_preserves_failure_artifacts_even_when_cleanup_was_
     monkeypatch.setattr(engine.subprocess, "run", _fake_run)
 
     with pytest.raises(XyceRunError) as exc_info:
-        execute_xyce_netlist(
+        run_xyce_netlist(
             xyce_path="Xyce",
             base_out_dir=tmp_path,
             netlist_content="* test\n.END\n",
@@ -133,10 +133,10 @@ def test_execute_xyce_netlist_preserves_failure_artifacts_even_when_cleanup_was_
     assert exc_info.value.csv_path.exists()
 
 
-def test_execute_xyce_netlist_cleanup_tolerates_missing_output_artifacts(monkeypatch, tmp_path):
+def test_run_xyce_netlist_cleanup_tolerates_missing_output_artifacts(monkeypatch, tmp_path):
     monkeypatch.setattr(engine.subprocess, "run", lambda *args, **kwargs: _completed_process())
 
-    result = execute_xyce_netlist(
+    result = run_xyce_netlist(
         xyce_path="Xyce",
         base_out_dir=tmp_path,
         netlist_content="* test\n.END\n",

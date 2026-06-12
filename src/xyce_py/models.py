@@ -245,7 +245,7 @@ class SolveResult:
     waveforms: pd.DataFrame
     solve_time_sec: float
     stdout: str
-    node_map_inverse: dict[str, Hashable]
+    spice_to_user_node: dict[str, Hashable]
 
     def translated_waveforms(self) -> pd.DataFrame:
         translated_waveforms = self.waveforms.copy()
@@ -258,6 +258,6 @@ class SolveResult:
         if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
             return column
         spice_node = column[2:-1]
-        if spice_node not in self.node_map_inverse:
+        if spice_node not in self.spice_to_user_node:
             return column
-        return f"V({self.node_map_inverse[spice_node]})"
+        return f"V({self.spice_to_user_node[spice_node]})"

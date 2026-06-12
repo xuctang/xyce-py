@@ -37,7 +37,7 @@ def test___all___exports_resolve_to_expected_objects():
         "VoltageSource": models.VoltageSource,
         "XyceExecutionResult": engine.XyceExecutionResult,
         "XyceRunError": engine.XyceRunError,
-        "execute_xyce_netlist": engine.execute_xyce_netlist,
+        "run_xyce_netlist": engine.run_xyce_netlist,
         "find_xyce_executable": engine.find_xyce_executable,
     }
 
@@ -104,7 +104,7 @@ def test_translated_waveforms_returns_new_dataframe_without_mutating_original():
         waveforms=original,
         solve_time_sec=0.0,
         stdout="",
-        node_map_inverse={"N_1": "vout"},
+        spice_to_user_node={"N_1": "vout"},
     )
 
     translated = result.translated_waveforms()
@@ -120,7 +120,7 @@ def test_netlist_compiler_compile_appends_single_end_with_trailing_newline():
     circuit.add_node("gnd", is_ground=True)
     circuit.add_branch("vin", "gnd", [VoltageSource("src", 5.0)])
 
-    netlist = NetlistCompiler(circuit.G, circuit.global_directives).compile()
+    netlist = NetlistCompiler(circuit.G, circuit.spice_directives).compile()
 
     assert netlist.endswith(".END\n")
     assert netlist.count(".END") == 1

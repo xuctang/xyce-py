@@ -62,7 +62,7 @@ graph.add_branch("vin", "gnd", [VoltageSource("supply", 5.0)])
 graph.add_branch("vin", "vout", [Resistor("r1", 1000)])
 graph.add_branch("vout", "gnd", [Resistor("r2", 1000)])
 
-netlist = NetlistCompiler(graph.G, graph.global_directives).compile()
+netlist = NetlistCompiler(graph.G, graph.spice_directives).compile()
 print(netlist)
 ```
 

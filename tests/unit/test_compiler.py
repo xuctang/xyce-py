@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from xyce_py.compiler import CompiledNetlistBody, NetlistCompiler
+from xyce_py.compiler import NetlistBody, NetlistCompiler
 from xyce_py.graph import CircuitGraph
 from xyce_py.models import BJT, Capacitor, Resistor, VoltageSource
 
@@ -81,7 +81,7 @@ def test_compile_preserves_directive_then_element_then_device_order():
     circuit.add_branch("vin", "gnd", [VoltageSource("src", 5.0)])
     circuit.add_branch("collector", "gnd", [Resistor("load", 1000)])
     circuit.add_device(BJT("amp", "QMOD"), ["collector", "base", "gnd"])
-    compiler = NetlistCompiler(circuit.G, circuit.global_directives)
+    compiler = NetlistCompiler(circuit.G, circuit.spice_directives)
 
     lines = compiler.compile().splitlines()
 
@@ -109,7 +109,7 @@ def test_compile_handles_directive_only_grounded_graph():
     circuit = CircuitGraph(xyce_path="Xyce")
     circuit.add_node("gnd", is_ground=True)
     circuit.add_model(".MODEL DFAST D(IS=1e-9)")
-    compiler = NetlistCompiler(circuit.G, circuit.global_directives)
+    compiler = NetlistCompiler(circuit.G, circuit.spice_directives)
 
     netlist = compiler.compile()
 
@@ -130,23 +130,23 @@ def test_compile_body_returns_public_compiler_result_without_end_line():
 
     compiled_body = compiler.compile_body()
 
-    assert isinstance(compiled_body, CompiledNetlistBody)
+    assert isinstance(compiled_body, NetlistBody)
     assert compiled_body.lines[-1].startswith("R_r0 ")
     assert ".END" not in compiled_body.lines
-    assert compiled_body.node_map_forward == compiler.node_map_forward
-    assert compiled_body.node_map_inverse == compiler.node_map_inverse
+    assert compiled_body.user_to_spice_node == compiler.user_to_spice_node
+    assert compiled_body.spice_to_user_node == compiler.spice_to_user_node
     assert compiled_body.expanded_graph is not compiler.expanded_graph
 
 
-def test_compile_body_exposes_read_only_node_maps():
+def test_compile_body_exposes_read_only_user_spice_node_mappings():
     compiler = NetlistCompiler(_build_series_circuit(1).G, [])
 
     compiled_body = compiler.compile_body()
 
     with pytest.raises(TypeError):
-        compiled_body.node_map_forward["n1"] = "changed"
+        compiled_body.user_to_spice_node["n1"] = "changed"
     with pytest.raises(TypeError):
-        compiled_body.node_map_inverse["N_1"] = "changed"
+        compiled_body.spice_to_user_node["N_1"] = "changed"
 
 
 def test_compile_body_expanded_graph_is_independent_from_compiler_state():
@@ -163,9 +163,9 @@ def test_compiler_public_state_properties_are_defensive():
 
     compiler.compile()
     with pytest.raises(TypeError):
-        compiler.node_map_forward["n1"] = "changed"
+        compiler.user_to_spice_node["n1"] = "changed"
     with pytest.raises(TypeError):
-        compiler.node_map_inverse["N_1"] = "changed"
+        compiler.spice_to_user_node["N_1"] = "changed"
 
     expanded_graph = compiler.expanded_graph
     expanded_graph.add_node("external_only")
@@ -173,16 +173,16 @@ def test_compiler_public_state_properties_are_defensive():
     assert "external_only" not in compiler.expanded_graph
 
 
-def test_compile_node_maps_are_stable_across_repeated_calls():
+def test_compile_user_spice_node_mappings_are_stable_across_repeated_calls():
     compiler = NetlistCompiler(_build_series_circuit(2).G, [])
 
     compiler.compile()
-    first_forward = compiler.node_map_forward.copy()
-    first_inverse = compiler.node_map_inverse.copy()
+    first_user_to_spice_node = compiler.user_to_spice_node.copy()
+    first_spice_to_user_node = compiler.spice_to_user_node.copy()
     compiler.compile()
 
-    assert compiler.node_map_forward == first_forward
-    assert compiler.node_map_inverse == first_inverse
+    assert compiler.user_to_spice_node == first_user_to_spice_node
+    assert compiler.spice_to_user_node == first_spice_to_user_node
 
 
 def test_compile_expanded_graph_preserves_source_graph_metadata():

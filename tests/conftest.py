@@ -73,7 +73,7 @@ def stub_xyce_execution(monkeypatch):
     ) -> list[dict[str, object]]:
         frame = waveforms if waveforms is not None else pd.DataFrame({"V(N_1)": [10.0], "V(N_2)": [5.0]})
 
-        def _fake_execute_xyce_netlist(**kwargs):
+        def _fake_run_xyce_netlist(**kwargs):
             calls.append(kwargs)
             run_dir = Path(kwargs["base_out_dir"]) / kwargs["run_name"]
             return XyceExecutionResult(
@@ -85,7 +85,7 @@ def stub_xyce_execution(monkeypatch):
                 solve_time_sec=solve_time_sec,
             )
 
-        monkeypatch.setattr(graph_module, "execute_xyce_netlist", _fake_execute_xyce_netlist)
+        monkeypatch.setattr(graph_module, "run_xyce_netlist", _fake_run_xyce_netlist)
         return calls
 
     return _install

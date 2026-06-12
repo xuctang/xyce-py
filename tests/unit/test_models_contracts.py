@@ -160,7 +160,7 @@ def test_translated_waveforms_preserves_data_and_original_frame_after_data_mutat
         waveforms=original,
         solve_time_sec=0.0,
         stdout="",
-        node_map_inverse={"N_1": "vin"},
+        spice_to_user_node={"N_1": "vin"},
     )
 
     translated = result.translated_waveforms()
@@ -179,7 +179,7 @@ def test_translated_waveforms_handles_non_string_and_duplicate_columns():
         waveforms=original,
         solve_time_sec=0.0,
         stdout="",
-        node_map_inverse={"N_1": "vin"},
+        spice_to_user_node={"N_1": "vin"},
     )
 
     translated = result.translated_waveforms()

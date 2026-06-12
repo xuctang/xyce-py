@@ -198,12 +198,12 @@ def test_simulate_returns_expanded_graph_independent_from_circuit_graph(
     assert "result_only" not in circuit.G
 
 
-def test_simulate_returns_copied_node_map_inverse(monkeypatch, build_voltage_divider, stub_xyce_execution):
+def test_simulate_returns_copied_spice_to_user_node(monkeypatch, build_voltage_divider, stub_xyce_execution):
     class TrackingCompiler(graph_module.NetlistCompiler):
         last_instance = None
 
-        def __init__(self, graph, global_directives):
-            super().__init__(graph, global_directives)
+        def __init__(self, graph, spice_directives):
+            super().__init__(graph, spice_directives)
             TrackingCompiler.last_instance = self
 
     monkeypatch.setattr(graph_module, "NetlistCompiler", TrackingCompiler)
@@ -212,11 +212,11 @@ def test_simulate_returns_copied_node_map_inverse(monkeypatch, build_voltage_div
 
     result = circuit.simulate(".OP")
     compiler_instance = TrackingCompiler.last_instance
-    result.node_map_inverse["N_1"] = "changed"
+    result.spice_to_user_node["N_1"] = "changed"
 
     assert compiler_instance is not None
-    assert result.node_map_inverse is not compiler_instance.node_map_inverse
-    assert compiler_instance.node_map_inverse["N_1"] == "vin"
+    assert result.spice_to_user_node is not compiler_instance.spice_to_user_node
+    assert compiler_instance.spice_to_user_node["N_1"] == "vin"
 
 
 def test_simulate_rejects_too_many_deprecated_positional_arguments(build_voltage_divider, stub_xyce_execution):

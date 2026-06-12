@@ -1,5 +1,5 @@
 from .compiler import NetlistCompiler
-from .engine import XyceExecutionResult, XyceRunError, execute_xyce_netlist, find_xyce_executable
+from .engine import XyceExecutionResult, XyceRunError, run_xyce_netlist, find_xyce_executable
 from .graph import CircuitGraph, CircuitTopologyError
 from .models import (
     BJT,
@@ -36,6 +36,6 @@ __all__ = [
     "VoltageSource",
     "XyceExecutionResult",
     "XyceRunError",
-    "execute_xyce_netlist",
+    "run_xyce_netlist",
     "find_xyce_executable",
 ]

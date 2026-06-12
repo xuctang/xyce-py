@@ -20,7 +20,7 @@ def build_compile_only_netlist(package_module) -> str:
     circuit.add_branch("vin", "gnd", [package_module.VoltageSource("supply", 5.0)])
     circuit.add_branch("vin", "vout", [package_module.Resistor("r1", 1000)])
     circuit.add_branch("vout", "gnd", [package_module.Resistor("r2", 1000)])
-    return package_module.NetlistCompiler(circuit.G, circuit.global_directives).compile()
+    return package_module.NetlistCompiler(circuit.G, circuit.spice_directives).compile()
 
 
 def run_smoke(expect_version: str | None = None) -> dict[str, object]:

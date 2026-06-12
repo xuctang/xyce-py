@@ -37,7 +37,7 @@ class XyceExecutionResult:
     solve_time_sec: float
 
 
-def execute_xyce_netlist(
+def run_xyce_netlist(
     *,
     xyce_path: str,
     base_out_dir: Path | str,

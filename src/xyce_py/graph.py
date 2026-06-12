@@ -9,7 +9,7 @@ import networkx as nx
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
 from .compiler import NetlistCompiler
-from .engine import execute_xyce_netlist, find_xyce_executable
+from .engine import run_xyce_netlist, find_xyce_executable
 from .models import CircuitElement, NTerminalDevice, SolveResult
 
 
@@ -31,7 +31,7 @@ class CircuitGraph:
         solver_params: dict | None = None,
     ):
         self.G = nx.MultiDiGraph()
-        self.global_directives: list[str] = []
+        self.spice_directives: list[str] = []
         self.xyce_path = xyce_path or find_xyce_executable()
         self.base_out_dir = Path(base_out_dir).resolve()
         self.solver_params = dict(solver_params or {})
@@ -98,13 +98,13 @@ class CircuitGraph:
         directive = _validate_non_empty_string(model_string, "model_string")
         if not directive.startswith(".MODEL"):
             raise ValueError("model_string must start with '.MODEL'.")
-        self.global_directives.append(directive)
+        self.spice_directives.append(directive)
 
     def add_options(self, options_string: str):
         directive = _validate_non_empty_string(options_string, "options_string")
         if not directive.startswith(".OPTIONS"):
             raise ValueError("options_string must start with '.OPTIONS'.")
-        self.global_directives.append(directive)
+        self.spice_directives.append(directive)
 
     def add_subcircuit(self, subckt_string: str):
         directive = _validate_non_empty_string(subckt_string, "subckt_string").strip()
@@ -115,7 +115,7 @@ class CircuitGraph:
         # Raw SPICE subcircuits are treated as opaque text here. Arity mismatches
         # between a .SUBCKT definition and a Subcircuit instance are left for Xyce
         # to diagnose at execution time instead of being parsed heuristically.
-        self.global_directives.append(directive)
+        self.spice_directives.append(directive)
 
     def simulate(
         self,
@@ -131,14 +131,14 @@ class CircuitGraph:
         )
 
         self._validate_topology()
-        compiler = NetlistCompiler(self.G, self.global_directives)
+        compiler = NetlistCompiler(self.G, self.spice_directives)
         compiled_body = compiler.compile_body()
         if compiled_body.expanded_graph is None:
             raise RuntimeError("Compiler did not produce an expanded graph.")
         netlist_lines = list(compiled_body.lines)
         resolved_print_vars = self._resolve_print_vars(
             resolved_print_vars,
-            compiled_body.node_map_forward,
+            compiled_body.user_to_spice_node,
         )
         print_analysis_type = "DC" if analysis_type == "OP" else analysis_type
         netlist_lines.append(resolved_analysis_cmd)
@@ -148,7 +148,7 @@ class CircuitGraph:
         netlist_lines.append(".END")
         final_netlist = "\n".join(netlist_lines) + "\n"
 
-        execution_result = execute_xyce_netlist(
+        execution_result = run_xyce_netlist(
             xyce_path=self.xyce_path,
             base_out_dir=self.base_out_dir,
             netlist_content=final_netlist,
@@ -166,7 +166,7 @@ class CircuitGraph:
                     "Cannot use inplace=True with multi-point sweeps. "
                     "Extract data from SolveResult.waveforms instead."
                 )
-            self._apply_inplace_solution(waveforms, compiled_body.node_map_inverse)
+            self._apply_inplace_solution(waveforms, compiled_body.spice_to_user_node)
 
         return SolveResult(
             original_graph=original_graph,
@@ -175,7 +175,7 @@ class CircuitGraph:
             waveforms=waveforms,
             solve_time_sec=execution_result.solve_time_sec,
             stdout=execution_result.stdout,
-            node_map_inverse=dict(compiled_body.node_map_inverse),
+            spice_to_user_node=dict(compiled_body.spice_to_user_node),
         )
 
     def simulate_op(

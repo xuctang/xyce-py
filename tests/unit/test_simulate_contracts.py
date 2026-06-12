@@ -125,7 +125,7 @@ def test_xyce_execution_error_propagates_without_mutating_graph(monkeypatch, bui
     def _raise_error(**kwargs):
         raise XyceRunError("solver failed", returncode=1)
 
-    monkeypatch.setattr(graph_module, "execute_xyce_netlist", _raise_error)
+    monkeypatch.setattr(graph_module, "run_xyce_netlist", _raise_error)
     circuit = build_voltage_divider()
 
     with pytest.raises(XyceRunError, match="solver failed"):
@@ -140,18 +140,18 @@ def test_simulate_fails_fast_if_compiler_does_not_produce_expanded_graph(
     build_voltage_divider,
     stub_xyce_execution,
 ):
-    class BrokenCompiledBody:
+    class BrokenNetlistBody:
         lines = ("* Generated Circuit", ".OPTIONS DEVICE GMIN=1e-8")
-        node_map_forward = {"vin": "N_1", "vout": "N_2", "gnd": "0"}
-        node_map_inverse = {"N_1": "vin", "N_2": "vout", "0": "gnd"}
+        user_to_spice_node = {"vin": "N_1", "vout": "N_2", "gnd": "0"}
+        spice_to_user_node = {"N_1": "vin", "N_2": "vout", "0": "gnd"}
         expanded_graph = None
 
     class BrokenCompiler:
-        def __init__(self, graph, global_directives):
+        def __init__(self, graph, spice_directives):
             pass
 
         def compile_body(self):
-            return BrokenCompiledBody()
+            return BrokenNetlistBody()
 
     monkeypatch.setattr(graph_module, "NetlistCompiler", BrokenCompiler)
     stub_xyce_execution()

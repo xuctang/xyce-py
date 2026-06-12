@@ -85,7 +85,7 @@ def test_directive_helpers_preserve_valid_directives_verbatim():
     circuit.add_model(".MODEL DFAST D(IS=1e-9)")
     circuit.add_options(".OPTIONS DEVICE GMIN=1e-9")
 
-    assert circuit.global_directives == [
+    assert circuit.spice_directives == [
         ".MODEL DFAST D(IS=1e-9)",
         ".OPTIONS DEVICE GMIN=1e-9",
     ]
@@ -97,7 +97,7 @@ def test_add_subcircuit_preserves_internal_formatting_while_stripping_outer_whit
 
     circuit.add_subcircuit(subckt)
 
-    assert circuit.global_directives == [
+    assert circuit.spice_directives == [
         ".SUBCKT BUF IN OUT\n+ PARAMS: GAIN=2\nR1 OUT IN {GAIN}k\n.ENDS"
     ]
 

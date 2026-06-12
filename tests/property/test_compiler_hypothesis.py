@@ -25,7 +25,7 @@ EXTRA_COLUMNS = st.lists(
 
 
 @given(branch_lengths=BRANCH_LENGTHS)
-def test_grounded_graph_node_mapping_invariants_under_hypothesis(branch_lengths):
+def test_grounded_graph_user_spice_mapping_invariants_under_hypothesis(branch_lengths):
     circuit = CircuitGraph(xyce_path="Xyce")
     circuit.add_node("gnd", is_ground=True)
 
@@ -37,10 +37,10 @@ def test_grounded_graph_node_mapping_invariants_under_hypothesis(branch_lengths)
     compiler = NetlistCompiler(circuit.G, [])
     compiler.compile()
 
-    assert compiler.node_map_forward["gnd"] == "0"
-    assert list(compiler.node_map_forward.values()).count("0") == 1
-    assert len(compiler.node_map_forward) == len(branch_lengths) + 1
-    assert set(compiler.node_map_inverse.values()) == set(circuit.G.nodes)
+    assert compiler.user_to_spice_node["gnd"] == "0"
+    assert list(compiler.user_to_spice_node.values()).count("0") == 1
+    assert len(compiler.user_to_spice_node) == len(branch_lengths) + 1
+    assert set(compiler.spice_to_user_node.values()) == set(circuit.G.nodes)
 
 
 @given(branch_length=st.integers(min_value=1, max_value=6))
@@ -72,7 +72,7 @@ def test_translated_waveforms_only_rename_mapped_voltage_columns_under_hypothesi
         waveforms=frame,
         solve_time_sec=0.0,
         stdout="",
-        node_map_inverse={"N_1": "vin", "N_2": "vout"},
+        spice_to_user_node={"N_1": "vin", "N_2": "vout"},
     )
 
     translated = result.translated_waveforms()

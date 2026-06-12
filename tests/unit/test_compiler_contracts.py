@@ -19,7 +19,7 @@ def test_compile_exact_netlist_for_mixed_branch_and_device_topology():
     circuit.add_branch("vin", "vout", [Resistor("r1", 1000), Capacitor("c1", "1u")])
     circuit.add_device(BJT("amp", "QMOD"), ["vout", "vin", "gnd"])
 
-    netlist = NetlistCompiler(circuit.G, circuit.global_directives).compile()
+    netlist = NetlistCompiler(circuit.G, circuit.spice_directives).compile()
 
     assert netlist == (
         "* Generated Circuit\n"
@@ -78,7 +78,7 @@ def test_device_link_edges_are_preserved_in_expanded_graph_but_not_emitted_as_ne
     assert len([edge for edge in compiler.expanded_graph.edges(data=True) if edge[2].get("is_device_link")]) == 3
 
 
-def test_node_maps_skip_internal_device_nodes_and_map_exactly_one_ground():
+def test_user_spice_node_mappings_skip_internal_device_nodes_and_map_exactly_one_ground():
     circuit = CircuitGraph(xyce_path="Xyce")
     circuit.add_node("gnd", is_ground=True)
     circuit.add_device(BJT("q1", "QMOD"), ["collector", "base", "gnd"])
@@ -86,10 +86,10 @@ def test_node_maps_skip_internal_device_nodes_and_map_exactly_one_ground():
 
     compiler.compile()
 
-    assert "_DEV_q1" not in compiler.node_map_forward
-    assert compiler.node_map_forward["gnd"] == "0"
-    assert list(compiler.node_map_forward.values()).count("0") == 1
-    assert compiler.node_map_inverse["0"] == "gnd"
+    assert "_DEV_q1" not in compiler.user_to_spice_node
+    assert compiler.user_to_spice_node["gnd"] == "0"
+    assert list(compiler.user_to_spice_node.values()).count("0") == 1
+    assert compiler.spice_to_user_node["0"] == "gnd"
 
 
 def test_compile_preserves_graph_subclass_for_expanded_graph():
@@ -107,7 +107,7 @@ def test_compile_preserves_graph_subclass_for_expanded_graph():
     assert isinstance(compiler.expanded_graph, CustomMultiDiGraph)
 
 
-def test_compile_does_not_mutate_global_directives_list():
+def test_compile_does_not_mutate_spice_directives_list():
     directives = [".MODEL DFAST D(IS=1e-9)"]
     circuit = CircuitGraph(xyce_path="Xyce")
     circuit.add_node("gnd", is_ground=True)

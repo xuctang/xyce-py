@@ -49,7 +49,7 @@ def test_compiler_line_count_and_hidden_node_count_match_branch_lengths(branch_l
 
 
 @given(node_names=st.lists(NODE_NAMES, min_size=1, max_size=10, unique=True))
-def test_default_node_mapping_is_bijective_for_user_nodes(node_names):
+def test_compiler_maps_each_user_node_to_one_spice_node(node_names):
     circuit = CircuitGraph(xyce_path="Xyce")
     circuit.add_node("gnd", is_ground=True)
     circuit.add_branch(node_names[0], "gnd", [VoltageSource("src", 1.0)])
@@ -59,10 +59,10 @@ def test_default_node_mapping_is_bijective_for_user_nodes(node_names):
     compiler = NetlistCompiler(circuit.G, [])
     compiler.compile()
 
-    assert set(compiler.node_map_forward) == set(circuit.G.nodes)
-    assert set(compiler.node_map_inverse.values()) == set(circuit.G.nodes)
-    assert len(compiler.node_map_forward) == len(compiler.node_map_inverse)
-    assert compiler.node_map_forward["gnd"] == "0"
+    assert set(compiler.user_to_spice_node) == set(circuit.G.nodes)
+    assert set(compiler.spice_to_user_node.values()) == set(circuit.G.nodes)
+    assert len(compiler.user_to_spice_node) == len(compiler.spice_to_user_node)
+    assert compiler.user_to_spice_node["gnd"] == "0"
 
 
 @given(
@@ -79,7 +79,7 @@ def test_translated_waveforms_preserve_shape_data_and_unmapped_columns(mapped_co
     mapped_columns = [f"V(N_{index})" for index in range(1, mapped_count + 1)]
     columns = [*mapped_columns, *extra_columns]
     frame = pd.DataFrame([[float(index) for index in range(len(columns))]], columns=columns)
-    node_map_inverse = {f"N_{index}": f"node_{index}" for index in range(1, mapped_count + 1)}
+    spice_to_user_node = {f"N_{index}": f"node_{index}" for index in range(1, mapped_count + 1)}
     result = SolveResult(
         original_graph=CircuitGraph(xyce_path="Xyce").G,
         expanded_graph=CircuitGraph(xyce_path="Xyce").G,
@@ -87,7 +87,7 @@ def test_translated_waveforms_preserve_shape_data_and_unmapped_columns(mapped_co
         waveforms=frame,
         solve_time_sec=0.0,
         stdout="",
-        node_map_inverse=node_map_inverse,
+        spice_to_user_node=spice_to_user_node,
     )
 
     translated = result.translated_waveforms()

@@ -169,7 +169,7 @@ def test_translated_waveforms_leaves_unmapped_voltage_columns_unchanged():
         waveforms=waveforms,
         solve_time_sec=0.0,
         stdout="",
-        node_map_inverse={"N_1": "vin"},
+        spice_to_user_node={"N_1": "vin"},
     )
 
     translated = result.translated_waveforms()
