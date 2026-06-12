@@ -8,16 +8,10 @@ from typing import Optional, Union
 import networkx as nx
 import pandas as pd
 
+from ._validation import validate_non_empty_string as _validate_non_empty_string
+
 
 ValueLike = Union[str, float]
-
-
-def _validate_non_empty_string(value: object, field_name: str) -> str:
-    if not isinstance(value, str):
-        raise TypeError(f"{field_name} must be a string.")
-    if not value.strip():
-        raise ValueError(f"{field_name} must be a non-empty string.")
-    return value
 
 
 def _validate_numeric(value: object, field_name: str) -> float:

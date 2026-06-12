@@ -28,7 +28,12 @@ def test_installed_wheel_exposes_expected_distribution_metadata():
     assert metadata.version("xyce-py")
     assert package_metadata["Summary"]
     assert package_metadata["Requires-Python"] == ">=3.10"
-    assert "License :: OSI Approved :: MIT License" in package_metadata.get_all("Classifier", [])
+    assert package_metadata["License-Expression"] == "MIT"
+    assert package_metadata.get_all("Project-URL") == [
+        "Repository, https://github.com/xuctang/xyce-py",
+        "Issues, https://github.com/xuctang/xyce-py/issues",
+        "Documentation, https://github.com/xuctang/xyce-py#readme",
+    ]
 
 
 def test_built_sdist_and_wheel_contain_required_package_files():

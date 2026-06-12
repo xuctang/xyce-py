@@ -140,14 +140,18 @@ def test_simulate_fails_fast_if_compiler_does_not_produce_expanded_graph(
     build_voltage_divider,
     stub_xyce_execution,
 ):
+    class BrokenCompiledBody:
+        lines = ("* Generated Circuit", ".OPTIONS DEVICE GMIN=1e-8")
+        node_map_forward = {"vin": "N_1", "vout": "N_2", "gnd": "0"}
+        node_map_inverse = {"N_1": "vin", "N_2": "vout", "0": "gnd"}
+        expanded_graph = None
+
     class BrokenCompiler:
         def __init__(self, graph, global_directives):
-            self.node_map_forward = {"vin": "N_1", "vout": "N_2", "gnd": "0"}
-            self.node_map_inverse = {"N_1": "vin", "N_2": "vout", "0": "gnd"}
-            self.expanded_graph = None
+            pass
 
-        def _compile_body_lines(self):
-            return ["* Generated Circuit", ".OPTIONS DEVICE GMIN=1e-8"]
+        def compile_body(self):
+            return BrokenCompiledBody()
 
     monkeypatch.setattr(graph_module, "NetlistCompiler", BrokenCompiler)
     stub_xyce_execution()

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from xyce_py.compiler import NetlistCompiler
+from xyce_py.compiler import CompiledNetlistBody, NetlistCompiler
 from xyce_py.graph import CircuitGraph
 from xyce_py.models import BJT, Capacitor, Resistor, VoltageSource
 
@@ -123,6 +123,30 @@ def test_compile_appends_end_exactly_once():
 
     assert netlist.count(".END") == 1
     assert netlist.endswith(".END\n")
+
+
+def test_compile_body_returns_public_compiler_result_without_end_line():
+    compiler = NetlistCompiler(_build_series_circuit(1).G, [])
+
+    compiled_body = compiler.compile_body()
+
+    assert isinstance(compiled_body, CompiledNetlistBody)
+    assert compiled_body.lines[-1].startswith("R_r0 ")
+    assert ".END" not in compiled_body.lines
+    assert compiled_body.node_map_forward == compiler.node_map_forward
+    assert compiled_body.node_map_inverse == compiler.node_map_inverse
+    assert compiled_body.expanded_graph is compiler.expanded_graph
+
+
+def test_compile_body_copies_node_maps_for_callers():
+    compiler = NetlistCompiler(_build_series_circuit(1).G, [])
+
+    compiled_body = compiler.compile_body()
+    compiled_body.node_map_forward["n1"] = "changed"
+    compiled_body.node_map_inverse["N_1"] = "changed"
+
+    assert compiler.node_map_forward["n1"] == "N_1"
+    assert compiler.node_map_inverse["N_1"] == "n1"
 
 
 def test_compile_node_maps_are_stable_across_repeated_calls():

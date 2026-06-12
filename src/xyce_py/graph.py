@@ -7,17 +7,10 @@ import warnings
 
 import networkx as nx
 
+from ._validation import validate_non_empty_string as _validate_non_empty_string
 from .compiler import NetlistCompiler
 from .engine import _execute_xyce_netlist, find_xyce_executable
 from .models import CircuitElement, NTerminalDevice, SolveResult
-
-
-def _validate_non_empty_string(value: object, field_name: str) -> str:
-    if not isinstance(value, str):
-        raise TypeError(f"{field_name} must be a string.")
-    if not value.strip():
-        raise ValueError(f"{field_name} must be a non-empty string.")
-    return value
 
 
 def _validate_user_node_id(node_id: Hashable) -> Hashable:
@@ -139,10 +132,13 @@ class CircuitGraph:
 
         self._validate_topology()
         compiler = NetlistCompiler(self.G, self.global_directives)
-        netlist_lines = compiler._compile_body_lines()
+        compiled_body = compiler.compile_body()
+        if compiled_body.expanded_graph is None:
+            raise RuntimeError("Compiler did not produce an expanded graph.")
+        netlist_lines = list(compiled_body.lines)
         resolved_print_vars = self._resolve_print_vars(
             resolved_print_vars,
-            compiler.node_map_forward,
+            compiled_body.node_map_forward,
         )
         print_analysis_type = "DC" if analysis_type == "OP" else analysis_type
         netlist_lines.append(resolved_analysis_cmd)
@@ -161,11 +157,8 @@ class CircuitGraph:
             keep_run_dir=False,
         )
 
-        if compiler.expanded_graph is None:
-            raise RuntimeError("Compiler did not produce an expanded graph.")
-
         original_graph = self.G.copy()
-        expanded_graph = compiler.expanded_graph
+        expanded_graph = compiled_body.expanded_graph
         waveforms = execution_result.waveforms
         if inplace:
             if len(waveforms) != 1:
@@ -173,7 +166,7 @@ class CircuitGraph:
                     "Cannot use inplace=True with multi-point sweeps. "
                     "Extract data from SolveResult.waveforms instead."
                 )
-            self._apply_inplace_solution(waveforms, compiler.node_map_inverse)
+            self._apply_inplace_solution(waveforms, compiled_body.node_map_inverse)
 
         return SolveResult(
             original_graph=original_graph,
@@ -182,7 +175,7 @@ class CircuitGraph:
             waveforms=waveforms,
             solve_time_sec=execution_result.solve_time_sec,
             stdout=execution_result.stdout,
-            node_map_inverse=compiler.node_map_inverse.copy(),
+            node_map_inverse=compiled_body.node_map_inverse.copy(),
         )
 
     def simulate_op(

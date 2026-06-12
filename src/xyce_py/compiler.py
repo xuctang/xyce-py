@@ -1,6 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import networkx as nx
+
+
+@dataclass(frozen=True)
+class CompiledNetlistBody:
+    lines: tuple[str, ...]
+    node_map_forward: dict[object, str]
+    node_map_inverse: dict[str, object]
+    expanded_graph: nx.MultiDiGraph
 
 
 class NetlistCompiler:
@@ -12,9 +22,20 @@ class NetlistCompiler:
         self.expanded_graph: nx.MultiDiGraph | None = None
 
     def compile(self) -> str:
-        netlist_lines = self._compile_body_lines()
+        netlist_lines = list(self.compile_body().lines)
         netlist_lines.append(".END")
         return "\n".join(netlist_lines) + "\n"
+
+    def compile_body(self) -> CompiledNetlistBody:
+        netlist_lines = self._compile_body_lines()
+        if self.expanded_graph is None:
+            raise RuntimeError("Compiler did not produce an expanded graph.")
+        return CompiledNetlistBody(
+            lines=tuple(netlist_lines),
+            node_map_forward=self.node_map_forward.copy(),
+            node_map_inverse=self.node_map_inverse.copy(),
+            expanded_graph=self.expanded_graph,
+        )
 
     def _compile_body_lines(self) -> list[str]:
         self.node_map_forward = {}
