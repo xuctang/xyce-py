@@ -8,12 +8,16 @@ import sys
 EXPECTED_EXPORTS = {
     "CircuitGraph",
     "NetlistCompiler",
+    "MonteCarloParameter",
+    "NormalDistribution",
     "OptionsDirective",
     "OutputSpec",
     "ParameterDirective",
     "parse_measurements",
     "Resistor",
     "SweepParameter",
+    "UniformDistribution",
+    "XyceMonteCarloSweep",
     "VoltageSource",
     "XyceParameterSweep",
     "XyceProject",
@@ -78,6 +82,17 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     if len(sweep.points()) != 2:
         raise AssertionError("Parameter sweep smoke did not produce the expected point count.")
 
+    monte_carlo = xyce_py.XyceMonteCarloSweep(
+        "smoke-monte-carlo",
+        "* smoke mc\nR1 1 0 {RLOAD}\n.OP\n.PRINT DC FORMAT=CSV FILE=raw.csv V(1)\n.END\n",
+        parameters=(xyce_py.MonteCarloParameter("RLOAD", xyce_py.UniformDistribution(1_000, 2_000)),),
+        samples=2,
+        seed=1,
+        output_specs=(xyce_py.OutputSpec.csv("waveforms", "raw.csv"),),
+    )
+    if len(monte_carlo.points()) != 2:
+        raise AssertionError("Monte Carlo smoke did not produce the expected point count.")
+
     parameter_line = xyce_py.ParameterDirective("RLOAD", "1k").to_spice()
     if parameter_line != ".PARAM RLOAD=1k":
         raise AssertionError("ParameterDirective smoke did not emit the expected .PARAM line.")
@@ -102,6 +117,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "parameter_directive": parameter_line,
         "parsed_measurements": len(measurements),
         "raw_project_outputs": len(raw_project.output_specs),
+        "monte_carlo_points": len(monte_carlo.points()),
         "sweep_points": len(sweep.points()),
     }
 

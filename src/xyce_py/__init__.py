@@ -6,9 +6,13 @@ from .measurements import MeasurementResult, parse_measurements, read_measuremen
 from .netlists import XyceProject, XyceProjectResult
 from .outputs import OutputArtifact, OutputSpec
 from .sweeps import (
+    MonteCarloParameter,
+    NormalDistribution,
     SweepParameter,
     SweepPoint,
     SweepRunResult,
+    UniformDistribution,
+    XyceMonteCarloSweep,
     XyceParameterSweep,
     XyceParameterSweepResult,
 )
@@ -41,8 +45,10 @@ __all__ = [
     "MOSFET",
     "MeasureDirective",
     "MeasurementResult",
+    "MonteCarloParameter",
     "NTerminalDevice",
     "NetlistCompiler",
+    "NormalDistribution",
     "OptionsDirective",
     "OutputArtifact",
     "OutputSpec",
@@ -55,8 +61,10 @@ __all__ = [
     "SweepParameter",
     "SweepPoint",
     "SweepRunResult",
+    "UniformDistribution",
     "VoltageSource",
     "XyceExecutionResult",
+    "XyceMonteCarloSweep",
     "XyceParameterSweep",
     "XyceParameterSweepResult",
     "XyceProject",

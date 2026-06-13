@@ -221,6 +221,21 @@ print(result.run(0).result.output("waveforms").frame)
 
 Native Xyce `.STEP` netlists can still be run exactly through `XyceProject`.
 
+For deterministic Monte Carlo sweeps, provide explicit distributions and a seed:
+
+```python
+from xyce_py import MonteCarloParameter, UniformDistribution, XyceMonteCarloSweep
+
+monte_carlo = XyceMonteCarloSweep(
+    "divider-monte-carlo",
+    sweep.netlist_content,
+    parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1000, 3000)),),
+    samples=10,
+    seed=7,
+    output_specs=sweep.output_specs,
+)
+```
+
 ## Models, Options, and Subcircuits
 
 Raw Xyce directives can be attached to the graph when needed:

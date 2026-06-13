@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import random
 
 import pandas as pd
 import pytest
@@ -10,8 +11,12 @@ from xyce_py.engine import XyceExecutionResult
 from xyce_py.netlists import XyceProjectResult
 from xyce_py.outputs import OutputSpec
 from xyce_py.sweeps import (
+    MonteCarloParameter,
+    NormalDistribution,
     SweepParameter,
     SweepPoint,
+    UniformDistribution,
+    XyceMonteCarloSweep,
     XyceParameterSweep,
     XyceParameterSweepResult,
 )
@@ -55,6 +60,18 @@ def test_sweep_parameter_rejects_invalid_values(bad_values):
         SweepParameter("RLOAD", bad_values)
 
 
+def test_monte_carlo_distributions_validate_numeric_contracts():
+    assert UniformDistribution(1, 2).sample(random.Random(0)) > 1
+    assert isinstance(NormalDistribution(0, 1).sample(random.Random(0)), float)
+
+    with pytest.raises(ValueError, match="high must be greater than low"):
+        UniformDistribution(1, 1)
+    with pytest.raises(ValueError, match="stddev must be positive"):
+        NormalDistribution(0, 0)
+    with pytest.raises(TypeError, match="distribution must be"):
+        MonteCarloParameter("RLOAD", object())
+
+
 def test_xyce_parameter_sweep_builds_cartesian_sweep_points_and_netlists():
     sweep = XyceParameterSweep(
         "divider",
@@ -79,6 +96,34 @@ def test_xyce_parameter_sweep_builds_cartesian_sweep_points_and_netlists():
     assert first_netlist.endswith(".END\n")
 
 
+def test_xyce_monte_carlo_sweep_generates_deterministic_points_and_netlists():
+    first = XyceMonteCarloSweep(
+        "mc",
+        RAW_NETLIST,
+        parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1000, 3000)),),
+        samples=3,
+        seed=42,
+        output_specs=(OutputSpec.csv("waveforms", "out.csv"),),
+    )
+    second = XyceMonteCarloSweep(
+        "mc",
+        RAW_NETLIST,
+        parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1000, 3000)),),
+        samples=3,
+        seed=42,
+        output_specs=(OutputSpec.csv("waveforms", "out.csv"),),
+    )
+
+    first_points = first.points()
+    second_points = second.points()
+
+    assert [dict(point.parameters) for point in first_points] == [
+        dict(point.parameters) for point in second_points
+    ]
+    assert len(first_points) == 3
+    assert first.netlist_for_point(first_points[0]).startswith("* sweep divider\n.PARAM RLOAD=")
+
+
 def test_xyce_parameter_sweep_rejects_duplicate_or_existing_param_names():
     with pytest.raises(ValueError, match="Duplicate sweep parameter name"):
         XyceParameterSweep(
@@ -92,6 +137,41 @@ def test_xyce_parameter_sweep_rejects_duplicate_or_existing_param_names():
             "bad",
             "* sweep divider\n.PARAM RLOAD=1k\nR1 1 0 {RLOAD}\n.OP\n.END\n",
             (SweepParameter("RLOAD", [1000]),),
+        )
+
+
+def test_xyce_monte_carlo_sweep_rejects_invalid_contracts():
+    with pytest.raises(ValueError, match="samples must be positive"):
+        XyceMonteCarloSweep(
+            "bad",
+            RAW_NETLIST,
+            parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1, 2)),),
+            samples=0,
+        )
+    with pytest.raises(TypeError, match="seed must be an integer"):
+        XyceMonteCarloSweep(
+            "bad",
+            RAW_NETLIST,
+            parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1, 2)),),
+            samples=1,
+            seed=True,
+        )
+    with pytest.raises(ValueError, match="Duplicate Monte Carlo parameter"):
+        XyceMonteCarloSweep(
+            "bad",
+            RAW_NETLIST,
+            parameters=(
+                MonteCarloParameter("RLOAD", UniformDistribution(1, 2)),
+                MonteCarloParameter("rload", NormalDistribution(1, 0.1)),
+            ),
+            samples=1,
+        )
+    with pytest.raises(ValueError, match="already be defined"):
+        XyceMonteCarloSweep(
+            "bad",
+            "* sweep divider\n.PARAM RLOAD=1k\nR1 1 0 {RLOAD}\n.OP\n.END\n",
+            parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1, 2)),),
+            samples=1,
         )
 
 
@@ -164,6 +244,39 @@ def test_xyce_parameter_sweep_run_executes_each_point_through_xyce_project(monke
     assert result.run(1).point.parameters["RLOAD"] == "3000.0"
     with pytest.raises(KeyError):
         result.run(3)
+
+
+def test_xyce_monte_carlo_sweep_run_executes_generated_points_through_xyce_project(monkeypatch, tmp_path):
+    created_projects: list[dict[str, object]] = []
+
+    class FakeProject:
+        def __init__(self, name, netlist_content, output_specs=()):
+            created_projects.append(
+                {
+                    "name": name,
+                    "netlist_content": netlist_content,
+                    "output_specs": tuple(output_specs),
+                }
+            )
+
+        def run(self, **kwargs):
+            return _fake_project_result(Path(kwargs["base_out_dir"]) / kwargs["run_name"])
+
+    sweep = XyceMonteCarloSweep(
+        "mc",
+        RAW_NETLIST,
+        parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1000, 3000)),),
+        samples=2,
+        seed=7,
+        output_specs=(OutputSpec.csv("waveforms", "out.csv"),),
+    )
+    monkeypatch.setattr(sweeps, "XyceProject", FakeProject)
+
+    result = sweep.run(base_out_dir=tmp_path, run_name="mc-run")
+
+    assert [project["name"] for project in created_projects] == ["mc-run_0000", "mc-run_0001"]
+    assert all(".PARAM RLOAD=" in project["netlist_content"] for project in created_projects)
+    assert [run.point.index for run in result.runs] == [0, 1]
 
 
 def test_xyce_parameter_sweep_run_rejects_invalid_run_controls(tmp_path):
