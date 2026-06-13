@@ -8,6 +8,9 @@ The package does not replace Xyce. Xyce remains the simulation engine. `xyce-py`
 handles the Python-side work around it: graph construction, SPICE netlist
 generation, process execution, result loading, and node-name translation.
 
+For method-by-method documentation, see the
+[API Reference](docs/api-reference.md).
+
 ## What It Provides
 
 - A `CircuitGraph` API for building circuits from named nodes, branches, and

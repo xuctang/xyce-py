@@ -40,6 +40,6 @@ This matrix tracks the public support surface against the current Xyce documenta
 ## Release Gate
 
 Before a public release, every **Supported** and **Config-supported** row must
-have unit tests, public API tests, documentation examples where appropriate, and
-package-build validation. Every exact-text row must document that Xyce is the
-parser and must preserve exact netlist text.
+have unit tests, public API tests, API-reference coverage, documentation
+examples where appropriate, and package-build validation. Every exact-text row
+must document that Xyce is the parser and must preserve exact netlist text.
