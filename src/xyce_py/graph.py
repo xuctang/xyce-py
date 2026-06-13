@@ -53,16 +53,29 @@ def _contains_top_level_end(directive_text: str) -> bool:
     return False
 
 
+def _normalize_project_directive_item(directive: object) -> str:
+    if isinstance(directive, str):
+        return _validate_non_empty_string(directive, "simulation_directives item").strip()
+    to_spice = getattr(directive, "to_spice", None)
+    if not callable(to_spice):
+        raise TypeError("simulation_directives items must be strings or objects with to_spice().")
+    return _validate_non_empty_string(to_spice(), "simulation_directives item").strip()
+
+
 def _normalize_project_directives(simulation_directives: object) -> tuple[str, ...]:
     if isinstance(simulation_directives, str) or not isinstance(simulation_directives, Iterable):
-        raise TypeError("simulation_directives must be a non-empty iterable of strings.")
+        raise TypeError(
+            "simulation_directives must be a non-empty iterable of strings or to_spice specs."
+        )
 
     directives = tuple(
-        _validate_non_empty_string(directive, "simulation_directives item").strip()
+        _normalize_project_directive_item(directive)
         for directive in simulation_directives
     )
     if not directives:
-        raise ValueError("simulation_directives must be a non-empty iterable of strings.")
+        raise ValueError(
+            "simulation_directives must be a non-empty iterable of strings or to_spice specs."
+        )
 
     for directive in directives:
         if _contains_top_level_end(directive):
@@ -182,7 +195,7 @@ class CircuitGraph:
     def compile_project(
         self,
         name: str,
-        simulation_directives: Iterable[str],
+        simulation_directives: Iterable[object],
         output_specs: Iterable[OutputSpec] = (),
     ) -> XyceProject:
         compiled_body = self.compile_body()

@@ -62,6 +62,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
         Path("src/xyce_py/compiler.py"),
         Path("src/xyce_py/directives.py"),
         Path("src/xyce_py/engine.py"),
+        Path("src/xyce_py/features.py"),
         Path("src/xyce_py/graph.py"),
         Path("src/xyce_py/measurements.py"),
         Path("src/xyce_py/models.py"),
@@ -92,6 +93,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     assert "xyce_py/compiler.py" in wheel_names
     assert "xyce_py/directives.py" in wheel_names
     assert "xyce_py/engine.py" in wheel_names
+    assert "xyce_py/features.py" in wheel_names
     assert "xyce_py/graph.py" in wheel_names
     assert "xyce_py/measurements.py" in wheel_names
     assert "xyce_py/models.py" in wheel_names
@@ -112,6 +114,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     assert f"{sdist_root}/src/xyce_py/compiler.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/directives.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/engine.py" in sdist_names
+    assert f"{sdist_root}/src/xyce_py/features.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/graph.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/measurements.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/models.py" in sdist_names

@@ -7,6 +7,7 @@ import json
 import sys
 
 EXPECTED_EXPORTS = {
+    "AdmsWorkflowSpec",
     "CircuitGraph",
     "NetlistBody",
     "NetlistCompiler",
@@ -22,10 +23,21 @@ EXPECTED_EXPORTS = {
     "SweepParameter",
     "UniformDistribution",
     "XdmTranslator",
+    "XdmWorkflowSpec",
     "XyceMonteCarloSweep",
+    "XyceAnalysisSpec",
+    "XyceDeviceSpec",
+    "XyceDirectiveSpec",
+    "XyceFeatureConfig",
+    "XyceModelSpec",
+    "XyceOutputSpec",
     "VoltageSource",
     "XyceParameterSweep",
     "XyceProject",
+    "XyceReportSpec",
+    "XyceWorkflowError",
+    "XyceWorkflowResult",
+    "XyceWorkflowSpec",
     "find_xyce_executable",
 }
 
@@ -60,6 +72,48 @@ def build_compiled_graph_project(package_module):
             f".PRINT DC FORMAT=CSV FILE=compiled.csv V({body.user_to_spice_node['vout']})",
         ],
         output_specs=(package_module.OutputSpec.csv("waveforms", "compiled.csv"),),
+    )
+
+
+def build_configurable_feature_project(package_module):
+    circuit = package_module.CircuitGraph(xyce_path="Xyce")
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_branch("vin", "gnd", [package_module.VoltageSource("supply", 5.0)])
+    body = circuit.compile_body()
+    vin_node = body.user_to_spice_node["vin"]
+    config = package_module.XyceFeatureConfig.from_mapping(
+        {
+            "directives": [{"directive": ".PARAM", "positional": ["RLOAD=1k"]}],
+            "models": [{"model_name": "DFAST", "model_type": "D"}],
+            "devices": [{"device_name": "D1", "nodes": [vin_node, "0"], "model_name": "DFAST"}],
+            "analyses": [
+                {
+                    "directive": ".NOISE",
+                    "positional": [f"V({vin_node})", "V_supply", "DEC", "10", "1", "1e6"],
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "noise",
+                    "analysis_type": "noise",
+                    "variables": ["ONOISE", "INOISE"],
+                    "file": "noise.csv",
+                }
+            ],
+            "reports": [
+                {
+                    "name": "summary",
+                    "path": "summary.txt",
+                    "kind": "text",
+                    "required": False,
+                }
+            ],
+        }
+    )
+    return circuit.compile_project(
+        "feature-smoke",
+        config.directive_lines(),
+        output_specs=config.output_specs(),
     )
 
 
@@ -99,6 +153,15 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     compiled_project = build_compiled_graph_project(xyce_py)
     if ".PRINT DC FORMAT=CSV FILE=compiled.csv V(N_2)" not in compiled_project.netlist_content:
         raise AssertionError("Compiled graph project smoke did not preserve graph node translation.")
+
+    feature_project = build_configurable_feature_project(xyce_py)
+    if ".NOISE V(N_1) V_supply DEC 10 1 1e6" not in feature_project.netlist_content:
+        raise AssertionError("Configurable feature smoke did not emit the requested analysis line.")
+    if feature_project.output_specs != (
+        xyce_py.OutputSpec.csv("noise", "noise.csv"),
+        xyce_py.OutputSpec.text("summary", "summary.txt", required=False),
+    ):
+        raise AssertionError("Configurable feature smoke did not preserve declared output specs.")
 
     raw_element_line = xyce_py.RawTwoTerminalElement(
         "load",
@@ -166,6 +229,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "parsed_measurements": len(measurements),
         "raw_project_outputs": len(raw_project.output_specs),
         "compiled_project_outputs": len(compiled_project.output_specs),
+        "feature_project_outputs": len(feature_project.output_specs),
         "monte_carlo_points": len(monte_carlo.points()),
         "sweep_points": len(sweep.points()),
         "xdm_path": xdm_translator.xdm_path,

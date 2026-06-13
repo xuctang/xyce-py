@@ -8,7 +8,19 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 import xyce_py
-from xyce_py import compiler, directives, engine, graph, measurements, models, netlists, outputs, sweeps, xdm
+from xyce_py import (
+    compiler,
+    directives,
+    engine,
+    features,
+    graph,
+    measurements,
+    models,
+    netlists,
+    outputs,
+    sweeps,
+    xdm,
+)
 from xyce_py.compiler import NetlistCompiler
 from xyce_py.graph import CircuitGraph
 from xyce_py.models import SolveResult, Subcircuit, VoltageSource
@@ -20,6 +32,7 @@ pytestmark = pytest.mark.unit
 def test___all___exports_resolve_to_expected_objects():
     expected_objects = {
         "BJT": models.BJT,
+        "AdmsWorkflowSpec": features.AdmsWorkflowSpec,
         "BehavioralSource": models.BehavioralSource,
         "Capacitor": models.Capacitor,
         "CircuitElement": models.CircuitElement,
@@ -52,16 +65,27 @@ def test___all___exports_resolve_to_expected_objects():
         "SweepRunResult": sweeps.SweepRunResult,
         "UniformDistribution": sweeps.UniformDistribution,
         "VoltageSource": models.VoltageSource,
+        "XdmWorkflowSpec": features.XdmWorkflowSpec,
         "XdmTranslationError": xdm.XdmTranslationError,
         "XdmTranslationResult": xdm.XdmTranslationResult,
         "XdmTranslator": xdm.XdmTranslator,
         "XyceExecutionResult": engine.XyceExecutionResult,
+        "XyceAnalysisSpec": features.XyceAnalysisSpec,
+        "XyceDeviceSpec": features.XyceDeviceSpec,
+        "XyceDirectiveSpec": features.XyceDirectiveSpec,
+        "XyceFeatureConfig": features.XyceFeatureConfig,
         "XyceMonteCarloSweep": sweeps.XyceMonteCarloSweep,
+        "XyceModelSpec": features.XyceModelSpec,
+        "XyceOutputSpec": features.XyceOutputSpec,
         "XyceParameterSweep": sweeps.XyceParameterSweep,
         "XyceParameterSweepResult": sweeps.XyceParameterSweepResult,
         "XyceProject": netlists.XyceProject,
         "XyceProjectResult": netlists.XyceProjectResult,
+        "XyceReportSpec": features.XyceReportSpec,
         "XyceRunError": engine.XyceRunError,
+        "XyceWorkflowError": features.XyceWorkflowError,
+        "XyceWorkflowResult": features.XyceWorkflowResult,
+        "XyceWorkflowSpec": features.XyceWorkflowSpec,
         "parse_measurements": measurements.parse_measurements,
         "read_measurements": measurements.read_measurements,
         "run_xyce_netlist": engine.run_xyce_netlist,

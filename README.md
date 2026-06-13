@@ -135,25 +135,37 @@ You can also call `graph.simulate(".OP")`, `graph.simulate(".TRAN ...")`,
 `graph.simulate(".AC ...")`, or `graph.simulate(".DC ...")` directly.
 
 For advanced Xyce analyses, keep `simulate()` on its strict helper path and
-compile the graph into a raw project instead:
+compile the graph into a project with configurable Xyce feature specs:
 
 ```python
-from xyce_py import OutputSpec
+from xyce_py import XyceAnalysisSpec, XyceFeatureConfig, XyceOutputSpec
 
 body = graph.compile_body()
+vout = body.user_to_spice_node["vout"]
+config = XyceFeatureConfig(
+    analyses=[
+        XyceAnalysisSpec(".NOISE", [f"V({vout})", "V_supply", "DEC", "10", "1", "1e6"]),
+    ],
+    outputs=[
+        XyceOutputSpec("noise", "NOISE", ["ONOISE", "INOISE"], "noise.csv"),
+    ],
+)
 project = graph.compile_project(
     "noise-analysis",
-    [
-        f".NOISE V({body.user_to_spice_node['vout']}) V_supply DEC 10 1 1e6",
-        ".PRINT NOISE FORMAT=CSV FILE=noise.csv ONOISE INOISE",
-    ],
-    output_specs=(OutputSpec.csv("noise", "noise.csv"),),
+    config.directive_lines(),
+    output_specs=config.output_specs(),
 )
 result = project.run(xyce_path="Xyce")
 ```
 
-`compile_project()` does not parse advanced directive semantics. It validates the
-Python-side directive list, appends `.END`, and leaves analysis syntax to Xyce.
+`compile_project()` validates topology, directive-list shape, output specs, and
+package-owned `.END` insertion. It does not parse advanced Xyce semantics.
+When configurable lines refer to graph nodes, use `compile_body()` to get the
+generated SPICE node names.
+
+See [Configurable Xyce Features](docs/configurable-features.md) for `.NOISE`,
+`.HB`, `.SENS`, `.FOUR`, `.STEP`, arbitrary devices, arbitrary models, output
+reports, XDM, and ADMS workflow examples.
 
 ## Run Raw Xyce Netlists
 
@@ -347,6 +359,16 @@ measure_line = MeasureDirective(
     "rise_time",
     "TRIG V(out) VAL=0.1 RISE=1 TARG V(out) VAL=0.9 RISE=1",
 ).to_spice()
+```
+
+Use configurable feature specs when the Xyce feature should be data-driven or is
+outside the small typed helper set:
+
+```python
+from xyce_py import XyceDeviceSpec, XyceModelSpec
+
+model_line = XyceModelSpec("DFAST", "D", {"IS": "1e-12"}).to_spice()
+device_line = XyceDeviceSpec("D1", ["out", "0"], model_name="DFAST").to_spice()
 ```
 
 ## Error Handling

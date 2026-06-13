@@ -5,6 +5,7 @@ from enum import Enum
 import pytest
 
 from xyce_py.compiler import NetlistBody
+from xyce_py.features import XyceAnalysisSpec
 from xyce_py.graph import CircuitGraph, CircuitTopologyError
 from xyce_py.models import BJT, Resistor
 from xyce_py.netlists import XyceProject
@@ -251,6 +252,27 @@ def test_compile_project_builds_raw_project_for_advanced_directives(build_voltag
     assert project.output_specs == (OutputSpec.csv("noise", "noise.csv"),)
 
 
+def test_compile_project_accepts_spec_objects_with_to_spice(build_voltage_divider):
+    circuit = build_voltage_divider()
+    body = circuit.compile_body()
+
+    project = circuit.compile_project(
+        "hb-project",
+        [
+            XyceAnalysisSpec(".HB", ["FREQ", "1e9"]),
+            XyceAnalysisSpec(
+                ".PRINT",
+                ["HB", "FORMAT=CSV", "FILE=hb.csv", f"V({body.user_to_spice_node['vout']})"],
+            ),
+        ],
+        output_specs=[OutputSpec.csv("hb", "hb.csv")],
+    )
+
+    assert ".HB FREQ 1e9" in project.netlist_content
+    assert ".PRINT HB FORMAT=CSV FILE=hb.csv V(N_2)" in project.netlist_content
+    assert project.netlist_content.endswith(".END\n")
+
+
 @pytest.mark.parametrize(
     ("simulation_directives", "error_type", "message"),
     [
@@ -259,6 +281,17 @@ def test_compile_project_builds_raw_project_for_advanced_directives(build_voltag
         ([".OP", ""], ValueError, "simulation_directives item must be a non-empty string"),
         ([".OP", ".END"], ValueError, "must not include '.END'"),
         ([".OP", "* comment\n.END"], ValueError, "must not include '.END'"),
+        ([".OP", object()], TypeError, "strings or objects with to_spice"),
+        (
+            [".OP", type("BadDirective", (), {"to_spice": lambda self: ".END"})()],
+            ValueError,
+            "must not include '.END'",
+        ),
+        (
+            [".OP", type("BadReturn", (), {"to_spice": lambda self: 3})()],
+            TypeError,
+            "simulation_directives item must be a string",
+        ),
     ],
 )
 def test_compile_project_rejects_invalid_simulation_directives(

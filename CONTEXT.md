@@ -40,6 +40,10 @@ _Avoid_: command, config line
 A typed Python object that emits one exact SPICE directive line while leaving directive internals to Xyce when they are expression-shaped.
 _Avoid_: parser, interpreter
 
+**Configurable Xyce feature**:
+A data-driven spec that emits exact Xyce netlist text or an exact external workflow command from validated Python configuration without parsing Xyce semantics.
+_Avoid_: universal Xyce parser, simulator reimplementation
+
 **Solver options**:
 Package-scoped `.OPTIONS` values supplied from Python and emitted into the netlist without interpreting Xyce option semantics.
 _Avoid_: solver config, runtime knobs

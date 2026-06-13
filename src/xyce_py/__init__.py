@@ -1,6 +1,20 @@
 from .compiler import NetlistBody, NetlistCompiler
 from .directives import MeasureDirective, OptionsDirective, ParameterDirective, PrintDirective, RawDirective
 from .engine import XyceExecutionResult, XyceRunError, run_xyce_netlist, find_xyce_executable
+from .features import (
+    AdmsWorkflowSpec,
+    XdmWorkflowSpec,
+    XyceAnalysisSpec,
+    XyceDeviceSpec,
+    XyceDirectiveSpec,
+    XyceFeatureConfig,
+    XyceModelSpec,
+    XyceOutputSpec,
+    XyceReportSpec,
+    XyceWorkflowError,
+    XyceWorkflowResult,
+    XyceWorkflowSpec,
+)
 from .graph import CircuitGraph, CircuitTopologyError
 from .measurements import MeasurementResult, parse_measurements, read_measurements
 from .netlists import XyceProject, XyceProjectResult
@@ -37,6 +51,7 @@ from .models import (
 
 __all__ = [
     "BJT",
+    "AdmsWorkflowSpec",
     "BehavioralSource",
     "Capacitor",
     "CircuitElement",
@@ -69,16 +84,27 @@ __all__ = [
     "SweepRunResult",
     "UniformDistribution",
     "VoltageSource",
+    "XdmWorkflowSpec",
     "XdmTranslationError",
     "XdmTranslationResult",
     "XdmTranslator",
     "XyceExecutionResult",
+    "XyceAnalysisSpec",
+    "XyceDeviceSpec",
+    "XyceDirectiveSpec",
+    "XyceFeatureConfig",
     "XyceMonteCarloSweep",
+    "XyceModelSpec",
+    "XyceOutputSpec",
     "XyceParameterSweep",
     "XyceParameterSweepResult",
     "XyceProject",
     "XyceProjectResult",
+    "XyceReportSpec",
     "XyceRunError",
+    "XyceWorkflowError",
+    "XyceWorkflowResult",
+    "XyceWorkflowSpec",
     "parse_measurements",
     "read_measurements",
     "run_xyce_netlist",
