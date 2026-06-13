@@ -126,3 +126,18 @@ def test_compile_fails_fast_for_non_device_edge_missing_elements_contract():
 
     with pytest.raises(KeyError):
         NetlistCompiler(graph, []).compile()
+
+
+def test_expanded_graph_is_none_before_compile():
+    compiler = NetlistCompiler(nx.MultiDiGraph(), [])
+
+    assert compiler.expanded_graph is None
+
+
+def test_compile_body_fails_fast_if_build_does_not_create_expanded_graph(monkeypatch):
+    compiler = NetlistCompiler(nx.MultiDiGraph(), [])
+
+    monkeypatch.setattr(compiler, "_build_body_lines", lambda: ["* Generated Circuit"])
+
+    with pytest.raises(RuntimeError, match="Compiler did not produce an expanded graph"):
+        compiler.compile_body()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import runpy
 
 import pandas as pd
 import pytest
@@ -142,3 +143,30 @@ def test_cli_run_returns_xyce_error_code_and_writes_error(monkeypatch, tmp_path,
     assert exit_code == 7
     assert "solver failed" in captured.err
     assert captured.out == ""
+
+
+def test_cli_output_summary_includes_text_character_count(tmp_path):
+    artifact = OutputArtifact(
+        spec=OutputSpec.text("measurements", "measure.txt"),
+        path=tmp_path / "measure.txt",
+        exists=True,
+        text="GAIN = 0.5\n",
+    )
+
+    summary = cli._summarize_output(artifact)
+
+    assert summary["characters"] == 11
+
+
+def test_cli_output_spec_extender_rejects_unknown_kind():
+    with pytest.raises(ValueError, match="kind must be exactly 'csv' or 'text'"):
+        cli._extend_output_specs([], [["waveforms", "out.csv"]], kind="json", required=True)
+
+
+def test_python_module_entrypoint_exits_through_cli_main(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["xyce-py"])
+
+    with pytest.raises(SystemExit) as caught:
+        runpy.run_module("xyce_py.__main__", run_name="__main__")
+
+    assert caught.value.code == 2

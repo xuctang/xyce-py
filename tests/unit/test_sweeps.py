@@ -71,6 +71,11 @@ def test_monte_carlo_distributions_validate_numeric_contracts():
     with pytest.raises(TypeError, match="distribution must be"):
         MonteCarloParameter("RLOAD", object())
 
+    with pytest.raises(TypeError, match="low must be numeric"):
+        UniformDistribution(True, 2)
+    with pytest.raises(TypeError, match="mean must be numeric"):
+        NormalDistribution(None, 1)
+
 
 def test_xyce_parameter_sweep_builds_cartesian_sweep_points_and_netlists():
     sweep = XyceParameterSweep(
@@ -139,6 +144,13 @@ def test_xyce_parameter_sweep_rejects_duplicate_or_existing_param_names():
             (SweepParameter("RLOAD", [1000]),),
         )
 
+    with pytest.raises(ValueError, match="already be defined"):
+        XyceParameterSweep(
+            "bad",
+            "* sweep divider\n\n.PARAM RLOAD=1k\nR1 1 0 {RLOAD}\n.OP\n.END\n",
+            (SweepParameter("RLOAD", [1000]),),
+        )
+
 
 def test_xyce_monte_carlo_sweep_rejects_invalid_contracts():
     with pytest.raises(ValueError, match="samples must be positive"):
@@ -156,6 +168,17 @@ def test_xyce_monte_carlo_sweep_rejects_invalid_contracts():
             samples=1,
             seed=True,
         )
+    with pytest.raises(TypeError, match="samples must be an integer"):
+        XyceMonteCarloSweep(
+            "bad",
+            RAW_NETLIST,
+            parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1, 2)),),
+            samples=True,
+        )
+    with pytest.raises(ValueError, match="parameters must be a non-empty sequence"):
+        XyceMonteCarloSweep("bad", RAW_NETLIST, parameters=(), samples=1)
+    with pytest.raises(TypeError, match="parameters must contain only MonteCarloParameter"):
+        XyceMonteCarloSweep("bad", RAW_NETLIST, parameters=("RLOAD",), samples=1)
     with pytest.raises(ValueError, match="Duplicate Monte Carlo parameter"):
         XyceMonteCarloSweep(
             "bad",
@@ -290,8 +313,14 @@ def test_xyce_parameter_sweep_run_rejects_invalid_run_controls(tmp_path):
 
 
 def test_sweep_point_rejects_invalid_shape():
+    with pytest.raises(TypeError, match="index must be an integer"):
+        SweepPoint(True, {"RLOAD": "1k"})
+
     with pytest.raises(ValueError, match="index must be non-negative"):
         SweepPoint(-1, {"RLOAD": "1k"})
+
+    with pytest.raises(TypeError, match="parameters must be a mapping"):
+        SweepPoint(0, [("RLOAD", "1k")])
 
     with pytest.raises(ValueError, match="parameters must be a non-empty mapping"):
         SweepPoint(0, {})
@@ -307,3 +336,15 @@ def test_sweep_point_parameters_are_read_only():
 def test_xyce_parameter_sweep_result_rejects_empty_runs():
     with pytest.raises(ValueError, match="runs must be a non-empty sequence"):
         XyceParameterSweepResult("empty", ())
+
+
+def test_xyce_monte_carlo_sweep_netlist_for_point_rejects_non_sweep_point():
+    sweep = XyceMonteCarloSweep(
+        "mc",
+        RAW_NETLIST,
+        parameters=(MonteCarloParameter("RLOAD", UniformDistribution(1000, 3000)),),
+        samples=1,
+    )
+
+    with pytest.raises(TypeError, match="point must be a SweepPoint instance"):
+        sweep.netlist_for_point(object())

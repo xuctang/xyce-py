@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pytest
 
 from xyce_py.directives import (
@@ -50,6 +52,24 @@ def test_options_directive_rejects_invalid_packages(bad_package):
 def test_options_directive_rejects_invalid_value_mappings(bad_values):
     with pytest.raises((TypeError, ValueError)):
         OptionsDirective("NONLIN", bad_values)
+
+
+def test_options_directive_rejects_duplicate_names_from_mapping_items():
+    class DuplicateOptionMapping(Mapping):
+        def __getitem__(self, key):
+            return 1
+
+        def __iter__(self):
+            return iter(["RELTOL"])
+
+        def __len__(self):
+            return 2
+
+        def items(self):
+            return iter([("RELTOL", 1), ("RELTOL", 2)])
+
+    with pytest.raises(ValueError, match="Duplicate option name"):
+        OptionsDirective("NONLIN", DuplicateOptionMapping())
 
 
 def test_print_directive_emits_csv_file_print_line():

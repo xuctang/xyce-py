@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pytest
 
 from xyce_py.graph import CircuitGraph, CircuitTopologyError
@@ -134,6 +136,29 @@ def test_constructor_solver_params_are_independent_from_caller_dict(tmp_path):
     params["NONLIN"]["RELTOL"] = 1e-2
 
     assert circuit.solver_params == {"NONLIN": {"RELTOL": "0.0001"}}
+
+
+def test_constructor_solver_params_rejects_non_mapping(tmp_path):
+    with pytest.raises(TypeError, match="solver_params must be a mapping"):
+        CircuitGraph(xyce_path="Xyce", base_out_dir=str(tmp_path), solver_params=[("NONLIN", {"RELTOL": 1e-4})])
+
+
+def test_constructor_solver_params_rejects_duplicate_packages_from_mapping_items(tmp_path):
+    class DuplicatePackageMapping(Mapping):
+        def __getitem__(self, key):
+            return {"RELTOL": 1e-4}
+
+        def __iter__(self):
+            return iter(["NONLIN"])
+
+        def __len__(self):
+            return 2
+
+        def items(self):
+            return iter([("NONLIN", {"RELTOL": 1e-4}), ("NONLIN", {"ABSTOL": 1e-12})])
+
+    with pytest.raises(ValueError, match="Duplicate solver option package"):
+        CircuitGraph(xyce_path="Xyce", base_out_dir=str(tmp_path), solver_params=DuplicatePackageMapping())
 
 
 @pytest.mark.parametrize("bad_solver_params", [{"RELTOL": 1e-4}, {"NONLIN": {}}, {"NONLIN": {"": 1}}])

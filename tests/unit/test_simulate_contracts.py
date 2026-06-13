@@ -37,6 +37,14 @@ def test_simulate_rejects_output_specs_without_kept_run_directory(build_voltage_
         circuit.simulate(".OP", output_specs=[OutputSpec.text("measurements", "circuit.cir.mt0")])
 
 
+def test_simulate_rejects_non_boolean_keep_run_dir(build_voltage_divider, stub_xyce_execution):
+    stub_xyce_execution()
+    circuit = build_voltage_divider()
+
+    with pytest.raises(TypeError, match="keep_run_dir must be a boolean"):
+        circuit.simulate(".OP", keep_run_dir="yes")
+
+
 def test_simulate_collects_declared_outputs_when_run_directory_is_kept(
     monkeypatch,
     build_voltage_divider,
@@ -85,6 +93,21 @@ def test_simulate_compiles_measurement_directives_with_user_node_translation(
     assert ".MEASURE TRAN max_out MAX V(vout)" not in result.netlist
 
 
+def test_simulate_leaves_non_string_user_node_measurement_references_untouched(
+    stub_xyce_execution,
+    tmp_path,
+):
+    stub_xyce_execution(waveforms=pd.DataFrame({"TIME": [0.0], "V(N_1)": [1.0]}))
+    circuit = CircuitGraph(xyce_path="Xyce", base_out_dir=str(tmp_path))
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_branch(1, "gnd", [VoltageSource("src", 1.0)])
+    circuit.add_measurement("TRAN", "max_int", "MAX V(1)")
+
+    result = circuit.simulate(".TRAN 1u 1u")
+
+    assert ".MEASURE TRAN max_int MAX V(1)" in result.netlist
+
+
 @pytest.mark.parametrize(
     ("analysis_cmd", "analysis_type"),
     [
@@ -119,6 +142,20 @@ def test_simulate_preserves_custom_print_var_order_and_skips_default_print_vars(
     result = circuit.simulate(".OP", print_vars=["I(V_src)", "V(N_2)"])
 
     assert ".PRINT DC FORMAT=CSV FILE=output.csv I(V_src) V(N_2)" in result.netlist
+    assert ".PRINT DC FORMAT=CSV FILE=output.csv V(N_1) V(N_2)" not in result.netlist
+
+
+def test_legacy_simulate_positional_print_vars_are_used(
+    build_voltage_divider,
+    stub_xyce_execution,
+):
+    stub_xyce_execution()
+    circuit = build_voltage_divider()
+
+    with pytest.warns(DeprecationWarning):
+        result = circuit.simulate("OP", ".OP", ["V(N_2)"])
+
+    assert ".PRINT DC FORMAT=CSV FILE=output.csv V(N_2)" in result.netlist
     assert ".PRINT DC FORMAT=CSV FILE=output.csv V(N_1) V(N_2)" not in result.netlist
 
 

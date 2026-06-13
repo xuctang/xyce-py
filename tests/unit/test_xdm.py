@@ -36,6 +36,21 @@ printf '* translated netlist\\n.END\\n' > "$2"
     assert result.translated_netlist_text() == "* translated netlist\n.END\n"
 
 
+def test_xdm_translator_defaults_working_dir_to_current_directory(monkeypatch, tmp_path):
+    translator_path = _write_executable(
+        tmp_path / "fake_xdm",
+        """#!/bin/sh
+pwd
+""",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    result = XdmTranslator(str(translator_path)).run([])
+
+    assert result.working_dir == tmp_path.resolve()
+    assert result.stdout == f"{tmp_path}\n"
+
+
 def test_xdm_translator_raises_structured_error_for_failed_translation(tmp_path):
     translator_path = _write_executable(
         tmp_path / "fake_xdm_fail",

@@ -11,9 +11,11 @@ from xyce_py.models import (
     MOSFET,
     BehavioralSource,
     Capacitor,
+    CircuitElement,
     CurrentSource,
     Diode,
     Inductor,
+    NTerminalDevice,
     RawNTerminalDevice,
     RawTwoTerminalElement,
     Resistor,
@@ -21,6 +23,7 @@ from xyce_py.models import (
     Subcircuit,
     VoltageSource,
 )
+from xyce_py.outputs import OutputArtifact, OutputSpec
 
 
 pytestmark = pytest.mark.unit
@@ -160,6 +163,27 @@ def test_raw_n_terminal_device_rejects_invalid_terminal_counts(terminals):
         RawNTerminalDevice("raw", "MODEL", terminals=terminals, template="X_$name $n0 $model_name")
 
 
+def test_abstract_base_methods_raise_when_called_by_concrete_subclasses():
+    class ConcreteElement(CircuitElement):
+        def to_spice(self, node_pos: str, node_neg: str) -> str:
+            return super().to_spice(node_pos, node_neg)
+
+    class ConcreteDevice(NTerminalDevice):
+        @property
+        def expected_terminals(self) -> int:
+            return super().expected_terminals
+
+        def to_spice(self, mapped_nodes: list[str]) -> str:
+            return super().to_spice(mapped_nodes)
+
+    with pytest.raises(NotImplementedError):
+        ConcreteElement("base").to_spice("n1", "0")
+    with pytest.raises(NotImplementedError):
+        ConcreteDevice("base", "MODEL").expected_terminals
+    with pytest.raises(NotImplementedError):
+        ConcreteDevice("base", "MODEL").to_spice(["n1"])
+
+
 def test_to_spice_calls_do_not_mutate_model_dataclass_state():
     models = [
         Resistor("r1", "1k"),
@@ -213,3 +237,26 @@ def test_translated_waveforms_handles_non_string_and_duplicate_columns():
 
     assert list(translated.columns) == ["V(vin)", "V(vin)", 7]
     assert list(original.columns) == ["V(N_1)", "V(N_1)", 7]
+
+
+def test_solve_result_measurements_rejects_non_text_output(tmp_path):
+    result = SolveResult(
+        original_graph=nx.MultiDiGraph(),
+        expanded_graph=nx.MultiDiGraph(),
+        netlist="* test\n.END\n",
+        waveforms=pd.DataFrame({"V(N_1)": [1.0]}),
+        solve_time_sec=0.0,
+        stdout="",
+        spice_to_user_node={"N_1": "vin"},
+        outputs={
+            "waveforms": OutputArtifact(
+                spec=OutputSpec.csv("waveforms", "output.csv"),
+                path=tmp_path / "output.csv",
+                exists=True,
+                frame=pd.DataFrame({"V(N_1)": [1.0]}),
+            )
+        },
+    )
+
+    with pytest.raises(TypeError, match="is not a text output artifact"):
+        result.measurements("waveforms")

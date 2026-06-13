@@ -81,6 +81,11 @@ def test_load_output_artifact_reads_csv_and_text_outputs(tmp_path):
     assert text_artifact.frame is None
 
 
+def test_load_output_artifact_rejects_non_output_spec(tmp_path):
+    with pytest.raises(TypeError, match="spec must be an OutputSpec instance"):
+        load_output_artifact(tmp_path, "output.csv")
+
+
 def test_load_output_artifact_fails_for_missing_required_output(tmp_path):
     with pytest.raises(FileNotFoundError, match="Required Xyce output 'waveforms' was not produced"):
         load_output_artifact(tmp_path, OutputSpec.csv("waveforms", "missing.csv"))
