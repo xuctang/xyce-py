@@ -6,7 +6,7 @@ This matrix maps wrapper-owned failure classes to automated tests. Xyce simulato
 | --- | --- | --- |
 | Public API and packaging | missing exports, stale package metadata, missing CLI entry point, missing `py.typed`, stale wheel/sdist contents | `tests/unit/test_api_contract.py`, `tests/packaging/test_installed_package.py`, `tests/unit/test_release_smoke.py` |
 | API reference documentation | missing public export entries, missing public class method/property entries | `tests/unit/test_api_reference_docs.py` |
-| Examples | missing target audience labels, invalid notebook JSON, dirty executed outputs, non-compilable notebook code cells | `tests/unit/test_examples.py` |
+| Examples | missing target audience labels, invalid notebook JSON, dirty executed outputs, non-compilable notebook code cells, beginner example drifting to low-level compiler seams | `tests/unit/test_examples.py` |
 | CLI | bad output declaration kind, text output summaries, Xyce failures, target-dir/discard controls, `python -m xyce_py` exit behavior | `tests/unit/test_cli.py`, `tests/integration/test_cli_run.py` |
 | Validation helpers | non-string, empty string, whitespace-only values | `tests/unit/test_directives.py`, `tests/unit/test_graph_contracts.py`, `tests/unit/test_models_contracts.py` |
 | Directive builders | invalid identifiers, duplicate option names, empty mappings/lists, invalid output paths, invalid analysis type, unsupported print format | `tests/unit/test_directives.py` |
