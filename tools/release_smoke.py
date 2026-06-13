@@ -11,6 +11,7 @@ EXPECTED_EXPORTS = {
     "OptionsDirective",
     "OutputSpec",
     "ParameterDirective",
+    "parse_measurements",
     "Resistor",
     "VoltageSource",
     "XyceProject",
@@ -74,6 +75,10 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     if options_line != ".OPTIONS NONLIN RELTOL=1e-4":
         raise AssertionError("OptionsDirective smoke did not emit the expected .OPTIONS line.")
 
+    measurements = xyce_py.parse_measurements("GAIN = 5.000000e-01\n")
+    if measurements["GAIN"].value != 0.5:
+        raise AssertionError("Measurement parser smoke did not parse the expected numeric value.")
+
     return {
         "package_name": package_metadata["Name"],
         "package_version": package_version,
@@ -84,6 +89,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "netlist_line_count": len(netlist.splitlines()),
         "options_directive": options_line,
         "parameter_directive": parameter_line,
+        "parsed_measurements": len(measurements),
         "raw_project_outputs": len(raw_project.output_specs),
     }
 

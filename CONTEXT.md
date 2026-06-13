@@ -56,6 +56,10 @@ _Avoid_: output guess, file hint
 The parsed or located file produced by Xyce for an output spec after execution.
 _Avoid_: output blob, loose file
 
+**Measurement result**:
+A named value parsed from Xyce `.MEASURE` output text while preserving the original value string.
+_Avoid_: metric, postprocess value
+
 **Netlist body**:
 The compiled netlist lines before simulation analysis directives, `.PRINT`, and `.END` are appended.
 _Avoid_: partial netlist, template

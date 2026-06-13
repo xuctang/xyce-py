@@ -133,6 +133,41 @@ def test_xyce_project_result_outputs_are_read_only(tmp_path):
         result.outputs["waveforms"] = object()
 
 
+def test_xyce_project_result_parses_measurement_text_output(tmp_path):
+    execution = _fake_execution(tmp_path)
+    result = XyceProjectResult(
+        execution=execution,
+        outputs={
+            "measurements": netlists.OutputArtifact(
+                spec=OutputSpec.text("measurements", "circuit.cir.mt0"),
+                path=tmp_path / "circuit.cir.mt0",
+                exists=True,
+                text="GAIN = 5.000000e-01\n",
+            )
+        },
+    )
+
+    assert result.measurements()["GAIN"].value == 0.5
+
+
+def test_xyce_project_result_measurements_rejects_non_text_output(tmp_path):
+    execution = _fake_execution(tmp_path)
+    result = XyceProjectResult(
+        execution=execution,
+        outputs={
+            "waveforms": netlists.OutputArtifact(
+                spec=OutputSpec.csv("waveforms", "output.csv"),
+                path=tmp_path / "output.csv",
+                exists=True,
+                frame=pd.DataFrame({"V(1)": [1.0]}),
+            )
+        },
+    )
+
+    with pytest.raises(TypeError, match="is not a text output artifact"):
+        result.measurements("waveforms")
+
+
 def test_xyce_project_run_uses_first_csv_output_as_engine_waveform_file(monkeypatch, tmp_path):
     captured: dict[str, object] = {}
 

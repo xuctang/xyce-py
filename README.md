@@ -142,6 +142,33 @@ result = project.run(xyce_path="Xyce")
 print(result.outputs["waveforms"].frame)
 ```
 
+For `.MEASURE` output, declare Xyce's generated measurement file as text and
+parse it from the project result:
+
+```python
+from xyce_py import MeasureDirective, OutputSpec, XyceProject
+
+project = XyceProject(
+    "measured-run",
+    f"""* measured transient
+V1 in 0 PULSE(0 1 0 1n 1n 5n 10n)
+R1 in out 1k
+C1 out 0 1n
+.TRAN 1n 20n
+.PRINT TRAN FORMAT=CSV FILE=waveforms.csv V(out)
+{MeasureDirective("TRAN", "max_out", "MAX V(out)").to_spice()}
+.END
+""",
+    output_specs=(
+        OutputSpec.csv("waveforms", "waveforms.csv"),
+        OutputSpec.text("measurements", "circuit.cir.mt0"),
+    ),
+)
+
+result = project.run(xyce_path="Xyce")
+print(result.measurements()["MAX_OUT"].value)
+```
+
 The same raw-netlist path is available from the command line:
 
 ```bash

@@ -7,6 +7,7 @@ from types import MappingProxyType
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
 from .engine import XyceExecutionResult, find_xyce_executable, run_xyce_netlist
+from .measurements import MeasurementResult, parse_measurements
 from .outputs import (
     OutputArtifact,
     OutputSpec,
@@ -82,6 +83,12 @@ class XyceProjectResult:
     def output(self, name: str) -> OutputArtifact:
         name = _validate_non_empty_string(name, "name")
         return self.outputs[name]
+
+    def measurements(self, output_name: str = "measurements") -> Mapping[str, MeasurementResult]:
+        artifact = self.output(output_name)
+        if artifact.text is None:
+            raise TypeError(f"Output {output_name!r} is not a text output artifact.")
+        return parse_measurements(artifact.text)
 
 
 @dataclass(frozen=True)
