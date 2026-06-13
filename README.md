@@ -10,6 +10,7 @@ generation, process execution, result loading, and node-name translation.
 
 For method-by-method documentation, see the
 [API Reference](docs/api-reference.md).
+For runnable user pipelines, see the [examples](examples/README.md).
 
 ## What It Provides
 
