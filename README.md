@@ -193,6 +193,34 @@ xyce-py run raw-divider.cir --csv-output waveforms raw.csv
 The command prints a JSON summary containing the run directory, solve time, Xyce
 stdout/stderr, and declared output metadata.
 
+## Run Parameter Sweeps
+
+Use `XyceParameterSweep` for Python-side sweeps over explicit `.PARAM` values:
+
+```python
+from xyce_py import OutputSpec, SweepParameter, XyceParameterSweep
+
+sweep = XyceParameterSweep(
+    "divider-sweep",
+    """* sweep divider
+V1 1 0 DC 10
+R1 1 2 {RLOAD}
+R2 2 0 1000
+.OP
+.PRINT DC FORMAT=CSV FILE=out.csv V(2)
+.END
+""",
+    parameters=(SweepParameter("RLOAD", [1000, 3000]),),
+    output_specs=(OutputSpec.csv("waveforms", "out.csv"),),
+)
+
+result = sweep.run(xyce_path="Xyce")
+print(result.run(0).point.parameters)
+print(result.run(0).result.output("waveforms").frame)
+```
+
+Native Xyce `.STEP` netlists can still be run exactly through `XyceProject`.
+
 ## Models, Options, and Subcircuits
 
 Raw Xyce directives can be attached to the graph when needed:

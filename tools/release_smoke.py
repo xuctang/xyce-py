@@ -13,7 +13,9 @@ EXPECTED_EXPORTS = {
     "ParameterDirective",
     "parse_measurements",
     "Resistor",
+    "SweepParameter",
     "VoltageSource",
+    "XyceParameterSweep",
     "XyceProject",
     "find_xyce_executable",
 }
@@ -67,6 +69,15 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     if raw_project.output_specs[0].path != "raw.csv":
         raise AssertionError("Raw-project smoke did not preserve the declared output path.")
 
+    sweep = xyce_py.XyceParameterSweep(
+        "smoke-sweep",
+        "* smoke sweep\nR1 1 0 {RLOAD}\n.OP\n.PRINT DC FORMAT=CSV FILE=raw.csv V(1)\n.END\n",
+        parameters=(xyce_py.SweepParameter("RLOAD", ["1k", "2k"]),),
+        output_specs=(xyce_py.OutputSpec.csv("waveforms", "raw.csv"),),
+    )
+    if len(sweep.points()) != 2:
+        raise AssertionError("Parameter sweep smoke did not produce the expected point count.")
+
     parameter_line = xyce_py.ParameterDirective("RLOAD", "1k").to_spice()
     if parameter_line != ".PARAM RLOAD=1k":
         raise AssertionError("ParameterDirective smoke did not emit the expected .PARAM line.")
@@ -91,6 +102,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "parameter_directive": parameter_line,
         "parsed_measurements": len(measurements),
         "raw_project_outputs": len(raw_project.output_specs),
+        "sweep_points": len(sweep.points()),
     }
 
 

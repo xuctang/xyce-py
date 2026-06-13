@@ -5,6 +5,13 @@ from .graph import CircuitGraph, CircuitTopologyError
 from .measurements import MeasurementResult, parse_measurements, read_measurements
 from .netlists import XyceProject, XyceProjectResult
 from .outputs import OutputArtifact, OutputSpec
+from .sweeps import (
+    SweepParameter,
+    SweepPoint,
+    SweepRunResult,
+    XyceParameterSweep,
+    XyceParameterSweepResult,
+)
 from .models import (
     BJT,
     MOSFET,
@@ -45,8 +52,13 @@ __all__ = [
     "Resistor",
     "SolveResult",
     "Subcircuit",
+    "SweepParameter",
+    "SweepPoint",
+    "SweepRunResult",
     "VoltageSource",
     "XyceExecutionResult",
+    "XyceParameterSweep",
+    "XyceParameterSweepResult",
     "XyceProject",
     "XyceProjectResult",
     "XyceRunError",
