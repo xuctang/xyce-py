@@ -13,10 +13,11 @@ This matrix tracks the public support surface against the current Xyce documenta
 
 | Capability area | Current support | Public interface | Verification |
 | --- | --- | --- | --- |
-| Python circuit topology | Supported | `CircuitGraph`, `NetlistCompiler` | Unit, property, and real-Xyce integration tests |
+| Python circuit topology | Supported | `CircuitGraph`, `NetlistCompiler`, `NetlistBody` | Unit, property, and real-Xyce integration tests |
 | Common two-terminal elements | Supported | `Resistor`, `Capacitor`, `Inductor`, `VoltageSource`, `CurrentSource`, `Diode`, `BehavioralSource` | Exact netlist unit tests and integration tests |
 | Common multi-terminal devices | Supported | `BJT`, `MOSFET`, `Subcircuit` | Exact netlist and arity contract tests |
-| Raw Xyce netlists | Supported | `XyceProject` | Unit tests for exact execution contracts and output parsing |
+| Raw template graph devices | Raw-supported | `RawTwoTerminalElement`, `RawNTerminalDevice` | Exact-line unit tests, compiler tests, public export tests, release smoke, and real-Xyce integration test |
+| Raw Xyce netlists | Supported | `XyceProject`, `CircuitGraph.compile_project` | Unit tests for exact execution contracts and output parsing; graph-compiled project unit and real-Xyce integration tests |
 | Opaque Xyce directives | Partial | `add_model`, `add_options`, `add_subcircuit`, raw project netlists | Directive contract tests |
 | Typed directive builders | Supported | `ParameterDirective`, `OptionsDirective`, `PrintDirective`, `MeasureDirective`, `RawDirective` | Exact-line unit tests and public export tests |
 | Solver options | Supported | `CircuitGraph(..., solver_params={"PACKAGE": {"OPTION": value}})`, `OptionsDirective` | Unit tests for shape validation and ordering; real-Xyce integration test |
@@ -24,7 +25,7 @@ This matrix tracks the public support surface against the current Xyce documenta
 | Transient analysis | Supported | `simulate_transient`, `simulate(".TRAN ...")` | Unit and real-Xyce integration tests |
 | AC analysis | Supported | `simulate_ac`, `simulate(".AC ...")` | Unit and real-Xyce integration tests |
 | DC analysis | Supported | `simulate_dc`, `simulate(".DC ...")` | Unit and real-Xyce integration tests |
-| Advanced analyses such as `.NOISE`, `.HB`, `.SENS`, `.FOUR`, `.STEP` | Raw-supported | `XyceProject` with exact netlist text | Raw execution contract tests; typed helpers planned |
+| Advanced analyses such as `.NOISE`, `.HB`, `.SENS`, `.FOUR`, `.STEP` | Raw-supported | `XyceProject` with exact netlist text, or `CircuitGraph.compile_project` with caller-owned directive lines | Raw execution contract tests, graph-compiled project tests, and release smoke; typed helpers planned only where a stable Python contract is justified |
 | Explicit output files | Supported | `OutputSpec`, `OutputArtifact`, `XyceProjectResult.outputs`, `SolveResult.outputs`, graph `output_specs` | Unit tests for CSV, text, missing, optional, graph collection, and malformed outputs |
 | Measurement extraction | Supported | `MeasureDirective`, `CircuitGraph.add_measurement`, `XyceProjectResult.measurements`, `SolveResult.measurements`, `parse_measurements`, `read_measurements` | Parser unit tests and real-Xyce `.mt0` integration tests |
 | Parameterization, sweeps, and Monte Carlo | Supported | `CircuitGraph.add_parameter`, `ParameterDirective`, `SweepParameter`, `XyceParameterSweep`, `MonteCarloParameter`, `UniformDistribution`, `NormalDistribution`, `XyceMonteCarloSweep`, exact native sweep directives inside `XyceProject` netlists | Unit and real-Xyce `.PARAM`, Python-side sweep, and deterministic Monte Carlo tests |
