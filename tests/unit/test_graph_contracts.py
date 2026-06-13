@@ -102,6 +102,13 @@ def test_add_subcircuit_preserves_internal_formatting_while_stripping_outer_whit
     ]
 
 
+def test_add_measurement_rejects_invalid_measurement_contract():
+    circuit = CircuitGraph(xyce_path="Xyce")
+
+    with pytest.raises(ValueError, match="analysis_type must not include the leading"):
+        circuit.add_measurement(".TRAN", "max_out", "MAX V(out)")
+
+
 def test_validate_topology_accepts_direction_reversed_paths_to_ground():
     circuit = CircuitGraph(xyce_path="Xyce")
     circuit.add_node("gnd", is_ground=True)

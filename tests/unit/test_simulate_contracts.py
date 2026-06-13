@@ -4,9 +4,10 @@ import pandas as pd
 import pytest
 
 import xyce_py.graph as graph_module
-from xyce_py.engine import XyceRunError
+from xyce_py.engine import XyceExecutionResult, XyceRunError
 from xyce_py.graph import CircuitGraph
 from xyce_py.models import BJT, Capacitor, Resistor, VoltageSource
+from xyce_py.outputs import OutputSpec
 
 
 pytestmark = pytest.mark.unit
@@ -26,6 +27,62 @@ def test_simulate_passes_exact_execution_contract_to_engine(build_voltage_divide
     assert call["run_name"].startswith("simulate_op_")
     assert call["keep_run_dir"] is False
     assert call["netlist_content"] == result.netlist
+
+
+def test_simulate_rejects_output_specs_without_kept_run_directory(build_voltage_divider, stub_xyce_execution):
+    stub_xyce_execution()
+    circuit = build_voltage_divider()
+
+    with pytest.raises(ValueError, match="keep_run_dir=True is required"):
+        circuit.simulate(".OP", output_specs=[OutputSpec.text("measurements", "circuit.cir.mt0")])
+
+
+def test_simulate_collects_declared_outputs_when_run_directory_is_kept(
+    monkeypatch,
+    build_voltage_divider,
+    tmp_path,
+):
+    def _fake_run_xyce_netlist(**kwargs):
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / "output.csv").write_text("V(N_1),V(N_2)\n10.0,5.0\n")
+        (run_dir / "circuit.cir.mt0").write_text("GAIN = 5.000000e-01\n")
+        return XyceExecutionResult(
+            run_dir=run_dir,
+            netlist_path=run_dir / "circuit.cir",
+            stdout="solver stdout",
+            stderr="",
+            waveforms=pd.DataFrame({"V(N_1)": [10.0], "V(N_2)": [5.0]}),
+            solve_time_sec=0.01,
+        )
+
+    monkeypatch.setattr(graph_module, "run_xyce_netlist", _fake_run_xyce_netlist)
+    circuit = build_voltage_divider(base_out_dir=tmp_path)
+
+    result = circuit.simulate(
+        ".OP",
+        output_specs=[OutputSpec.text("measurements", "circuit.cir.mt0")],
+        keep_run_dir=True,
+    )
+
+    assert result.output("measurements").text == "GAIN = 5.000000e-01\n"
+    assert result.measurements()["GAIN"].value == 0.5
+    with pytest.raises(TypeError):
+        result.outputs["extra"] = result.output("measurements")
+
+
+def test_simulate_compiles_measurement_directives_with_user_node_translation(
+    build_transient_graph,
+    stub_xyce_execution,
+):
+    stub_xyce_execution(waveforms=pd.DataFrame({"TIME": [0.0], "V(N_1)": [1.0], "V(N_2)": [0.5]}))
+    circuit = build_transient_graph()
+    circuit.add_measurement("TRAN", "max_out", "MAX V(vout)")
+
+    result = circuit.simulate_transient("1u", "2u")
+
+    assert ".MEASURE TRAN max_out MAX V(N_2)" in result.netlist
+    assert ".MEASURE TRAN max_out MAX V(vout)" not in result.netlist
 
 
 @pytest.mark.parametrize(
@@ -76,6 +133,21 @@ def test_default_print_vars_include_only_non_ground_mapped_user_nodes(stub_xyce_
     assert ".PRINT DC FORMAT=CSV FILE=output.csv V(N_1) V(N_2)" in result.netlist
     assert "V(0)" not in result.netlist
     assert "_DEV_q1" not in result.netlist
+
+
+def test_simulation_wrapper_passes_output_specs_and_keep_run_dir(build_voltage_divider, stub_xyce_execution):
+    calls = stub_xyce_execution()
+    circuit = build_voltage_divider()
+
+    result = circuit.simulate_transient(
+        "1u",
+        "2u",
+        output_specs=[],
+        keep_run_dir=True,
+    )
+
+    assert calls[0]["keep_run_dir"] is True
+    assert result.outputs == {}
 
 
 @pytest.mark.parametrize(

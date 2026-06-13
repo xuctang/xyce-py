@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Hashable, Mapping
+from collections.abc import Hashable, Iterable, Mapping
 from pathlib import Path
 import time
 import warnings
@@ -9,9 +9,10 @@ import networkx as nx
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
 from .compiler import NetlistCompiler
-from .directives import OptionsDirective, ParameterDirective, PrintDirective
+from .directives import MeasureDirective, OptionsDirective, ParameterDirective, PrintDirective
 from .engine import run_xyce_netlist, find_xyce_executable
 from .models import CircuitElement, NTerminalDevice, SolveResult
+from .outputs import OutputSpec, collect_output_artifacts, normalize_output_specs
 
 
 def _validate_user_node_id(node_id: Hashable) -> Hashable:
@@ -56,6 +57,7 @@ class CircuitGraph:
             OptionsDirective(package, values).to_spice()
             for package, values in self.solver_params.items()
         ]
+        self.measurement_directives: list[MeasureDirective] = []
 
     def add_node(self, node_id: Hashable, is_ground: bool = False):
         if not isinstance(node_id, Hashable):
@@ -130,6 +132,9 @@ class CircuitGraph:
     def add_parameter(self, name: str, value: object):
         self.spice_directives.append(ParameterDirective(name, value).to_spice())
 
+    def add_measurement(self, analysis_type: str, name: str, expression: str):
+        self.measurement_directives.append(MeasureDirective(analysis_type, name, expression))
+
     def add_subcircuit(self, subckt_string: str):
         directive = _validate_non_empty_string(subckt_string, "subckt_string").strip()
         if not directive.startswith(".SUBCKT"):
@@ -147,7 +152,15 @@ class CircuitGraph:
         *args,
         print_vars: list[str] | None = None,
         inplace: bool = False,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
+        if not isinstance(keep_run_dir, bool):
+            raise TypeError("keep_run_dir must be a boolean.")
+        normalized_output_specs = normalize_output_specs(output_specs or ())
+        if normalized_output_specs and not keep_run_dir:
+            raise ValueError("keep_run_dir=True is required when output_specs are requested.")
+
         analysis_type, resolved_analysis_cmd, resolved_print_vars = self._normalize_simulation_request(
             analysis_cmd,
             args,
@@ -167,6 +180,9 @@ class CircuitGraph:
         print_analysis_type = "DC" if analysis_type == "OP" else analysis_type
         netlist_lines.append(resolved_analysis_cmd)
         netlist_lines.append(PrintDirective(print_analysis_type, resolved_print_vars).to_spice())
+        netlist_lines.extend(
+            self._compiled_measurement_lines(compiled_body.user_to_spice_node)
+        )
         netlist_lines.append(".END")
         final_netlist = "\n".join(netlist_lines) + "\n"
 
@@ -176,8 +192,9 @@ class CircuitGraph:
             netlist_content=final_netlist,
             csv_name="output.csv",
             run_name=f"simulate_{analysis_type.lower()}_{time.time_ns()}",
-            keep_run_dir=False,
+            keep_run_dir=keep_run_dir,
         )
+        outputs = collect_output_artifacts(execution_result.run_dir, normalized_output_specs)
 
         original_graph = self.G.copy()
         expanded_graph = compiled_body.expanded_graph
@@ -198,14 +215,23 @@ class CircuitGraph:
             solve_time_sec=execution_result.solve_time_sec,
             stdout=execution_result.stdout,
             spice_to_user_node=dict(compiled_body.spice_to_user_node),
+            outputs=outputs,
         )
 
     def simulate_op(
         self,
         print_vars: list[str] | None = None,
         inplace: bool = False,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
-        return self.simulate(".OP", print_vars=print_vars, inplace=inplace)
+        return self.simulate(
+            ".OP",
+            print_vars=print_vars,
+            inplace=inplace,
+            output_specs=output_specs,
+            keep_run_dir=keep_run_dir,
+        )
 
     def simulate_transient(
         self,
@@ -214,6 +240,8 @@ class CircuitGraph:
         start: str = "0",
         print_vars: list[str] | None = None,
         inplace: bool = False,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
         step = _validate_non_empty_string(step, "step")
         stop = _validate_non_empty_string(stop, "stop")
@@ -221,7 +249,13 @@ class CircuitGraph:
         analysis_cmd = f".TRAN {step} {stop}"
         if start != "0":
             analysis_cmd += f" {start}"
-        return self.simulate(analysis_cmd, print_vars=print_vars, inplace=inplace)
+        return self.simulate(
+            analysis_cmd,
+            print_vars=print_vars,
+            inplace=inplace,
+            output_specs=output_specs,
+            keep_run_dir=keep_run_dir,
+        )
 
     def simulate_ac(
         self,
@@ -230,6 +264,8 @@ class CircuitGraph:
         start_freq: str,
         stop_freq: str,
         print_vars: list[str] | None = None,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
         sweep_type = _validate_non_empty_string(sweep_type, "sweep_type")
         points = _validate_non_empty_string(points, "points")
@@ -239,6 +275,8 @@ class CircuitGraph:
             f".AC {sweep_type} {points} {start_freq} {stop_freq}",
             print_vars=print_vars,
             inplace=False,
+            output_specs=output_specs,
+            keep_run_dir=keep_run_dir,
         )
 
     def simulate_dc(
@@ -248,6 +286,8 @@ class CircuitGraph:
         stop: str,
         step: str,
         print_vars: list[str] | None = None,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
         source_name = _validate_non_empty_string(source_name, "source_name")
         start = _validate_non_empty_string(start, "start")
@@ -257,6 +297,8 @@ class CircuitGraph:
             f".DC {source_name} {start} {stop} {step}",
             print_vars=print_vars,
             inplace=False,
+            output_specs=output_specs,
+            keep_run_dir=keep_run_dir,
         )
 
     def _validate_topology(self):
@@ -333,6 +375,19 @@ class CircuitGraph:
         if analysis_type not in {"OP", "TRAN", "AC", "DC"}:
             raise ValueError("analysis_cmd must start with one of: .OP, .TRAN, .AC, .DC.")
         return analysis_type
+
+    def _compiled_measurement_lines(self, user_to_spice_node: Mapping[object, str]) -> list[str]:
+        measurement_lines: list[str] = []
+        for directive in self.measurement_directives:
+            expression = directive.expression
+            for user_node, spice_node in user_to_spice_node.items():
+                if not isinstance(user_node, str):
+                    continue
+                expression = expression.replace(f"V({user_node})", f"V({spice_node})")
+            measurement_lines.append(
+                MeasureDirective(directive.analysis_type, directive.name, expression).to_spice()
+            )
+        return measurement_lines
 
     def _apply_inplace_solution(self, waveforms, spice_to_user_node: Mapping[str, object]):
         node_voltage_updates: dict[object, object] = {}

@@ -4,6 +4,7 @@ import pytest
 
 from xyce_py.graph import CircuitGraph
 from xyce_py.models import Capacitor, Inductor, Resistor, VoltageSource
+from xyce_py.outputs import OutputSpec
 
 
 pytestmark = pytest.mark.xyce
@@ -47,3 +48,28 @@ def test_simulate_tran_pulse_source_with_start_offset_real_xyce(tmp_path, xyce_p
 
     assert translated["V(vout)"].iloc[0] == pytest.approx(0.0, abs=1e-3)
     assert translated["V(vout)"].max() > 0.1
+
+
+def test_simulate_tran_collects_measurement_output_real_xyce(tmp_path, xyce_path_or_skip):
+    circuit = CircuitGraph(xyce_path=xyce_path_or_skip, base_out_dir=str(tmp_path))
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_branch(
+        "vin",
+        "gnd",
+        [VoltageSource("pulse", 0.0, "PULSE(0 1 0 1n 1n 5n 10n)")],
+    )
+    circuit.add_branch("vin", "vout", [Resistor("r1", 1000)])
+    circuit.add_branch("vout", "gnd", [Capacitor("c1", "1n")])
+    circuit.add_measurement("TRAN", "max_out", "MAX V(vout)")
+
+    result = circuit.simulate_transient(
+        "1n",
+        "20n",
+        output_specs=[OutputSpec.text("measurements", "circuit.cir.mt0")],
+        keep_run_dir=True,
+    )
+    measurements = result.measurements()
+
+    assert "MAX_OUT" in measurements
+    assert measurements["MAX_OUT"].value is not None
+    assert measurements["MAX_OUT"].value > 0.0

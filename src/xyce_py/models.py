@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from collections.abc import Hashable
+from dataclasses import dataclass, field
+from collections.abc import Hashable, Mapping
+from types import MappingProxyType
 from typing import Optional, Union
 
 import networkx as nx
 import pandas as pd
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
+from .measurements import MeasurementResult, parse_measurements
+from .outputs import OutputArtifact
 
 
 ValueLike = Union[str, float]
@@ -246,6 +249,10 @@ class SolveResult:
     solve_time_sec: float
     stdout: str
     spice_to_user_node: dict[str, Hashable]
+    outputs: Mapping[str, OutputArtifact] = field(default_factory=dict)
+
+    def __post_init__(self):
+        object.__setattr__(self, "outputs", MappingProxyType(dict(self.outputs)))
 
     def translated_waveforms(self) -> pd.DataFrame:
         translated_waveforms = self.waveforms.copy()
@@ -261,3 +268,13 @@ class SolveResult:
         if spice_node not in self.spice_to_user_node:
             return column
         return f"V({self.spice_to_user_node[spice_node]})"
+
+    def output(self, name: str) -> OutputArtifact:
+        name = _validate_non_empty_string(name, "name")
+        return self.outputs[name]
+
+    def measurements(self, output_name: str = "measurements") -> Mapping[str, MeasurementResult]:
+        artifact = self.output(output_name)
+        if artifact.text is None:
+            raise TypeError(f"Output {output_name!r} is not a text output artifact.")
+        return parse_measurements(artifact.text)

@@ -105,6 +105,21 @@ with TemporaryDirectory() as tmpdir:
 `result.translated_waveforms()` returns a copy with voltage columns translated
 back to the original user node names, such as `V(vin)` and `V(vout)`.
 
+Extra Xyce output files can be declared when the run directory is kept:
+
+```python
+from xyce_py import OutputSpec
+
+graph.add_measurement("TRAN", "max_out", "MAX V(vout)")
+result = graph.simulate_transient(
+    "1n",
+    "20n",
+    output_specs=[OutputSpec.text("measurements", "circuit.cir.mt0")],
+    keep_run_dir=True,
+)
+print(result.measurements()["MAX_OUT"].value)
+```
+
 ## Supported Analysis Helpers
 
 ```python

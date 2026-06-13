@@ -25,8 +25,8 @@ This matrix tracks the public support surface against the current Xyce documenta
 | AC analysis | Supported | `simulate_ac`, `simulate(".AC ...")` | Unit and real-Xyce integration tests |
 | DC analysis | Supported | `simulate_dc`, `simulate(".DC ...")` | Unit and real-Xyce integration tests |
 | Advanced analyses such as `.NOISE`, `.HB`, `.SENS`, `.FOUR`, `.STEP` | Raw-supported | `XyceProject` with exact netlist text | Raw execution contract tests; typed helpers planned |
-| Explicit output files | Supported | `OutputSpec`, `OutputArtifact`, `XyceProjectResult.outputs` | Unit tests for CSV, text, missing, optional, and malformed outputs |
-| Measurement extraction | Supported | `MeasureDirective`, `OutputSpec.text`, `XyceProjectResult.measurements`, `parse_measurements`, `read_measurements` | Parser unit tests and real-Xyce `.mt0` integration test |
+| Explicit output files | Supported | `OutputSpec`, `OutputArtifact`, `XyceProjectResult.outputs`, `SolveResult.outputs`, graph `output_specs` | Unit tests for CSV, text, missing, optional, graph collection, and malformed outputs |
+| Measurement extraction | Supported | `MeasureDirective`, `CircuitGraph.add_measurement`, `XyceProjectResult.measurements`, `SolveResult.measurements`, `parse_measurements`, `read_measurements` | Parser unit tests and real-Xyce `.mt0` integration tests |
 | Parameterization and sweeps | Partial | `CircuitGraph.add_parameter`, `ParameterDirective`, exact sweep directives inside `XyceProject` netlists | Unit and real-Xyce `.PARAM` tests; sweep helpers planned |
 | Schematic or XDM netlist import | Planned | None | XDM adapter planned |
 | Xyce/ADMS model development workflow | Planned | None | External-tool adapter planned |
