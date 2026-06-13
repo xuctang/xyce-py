@@ -121,9 +121,15 @@ def test_validate_topology_rejects_device_component_without_ground_connection():
 
 
 def test_constructor_solver_params_are_independent_from_caller_dict(tmp_path):
-    params = {"reltol": 1e-4}
+    params = {"NONLIN": {"RELTOL": 1e-4}}
     circuit = CircuitGraph(xyce_path="Xyce", base_out_dir=str(tmp_path), solver_params=params)
 
-    params["reltol"] = 1e-2
+    params["NONLIN"]["RELTOL"] = 1e-2
 
-    assert circuit.solver_params == {"reltol": 1e-4}
+    assert circuit.solver_params == {"NONLIN": {"RELTOL": "0.0001"}}
+
+
+@pytest.mark.parametrize("bad_solver_params", [{"RELTOL": 1e-4}, {"NONLIN": {}}, {"NONLIN": {"": 1}}])
+def test_constructor_solver_params_reject_ambiguous_or_invalid_shape(tmp_path, bad_solver_params):
+    with pytest.raises((TypeError, ValueError)):
+        CircuitGraph(xyce_path="Xyce", base_out_dir=str(tmp_path), solver_params=bad_solver_params)

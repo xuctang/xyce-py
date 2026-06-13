@@ -18,7 +18,8 @@ This matrix tracks the public support surface against the current Xyce documenta
 | Common multi-terminal devices | Supported | `BJT`, `MOSFET`, `Subcircuit` | Exact netlist and arity contract tests |
 | Raw Xyce netlists | Supported | `XyceProject` | Unit tests for exact execution contracts and output parsing |
 | Opaque Xyce directives | Partial | `add_model`, `add_options`, `add_subcircuit`, raw project netlists | Directive contract tests |
-| Typed directive builders | Supported | `ParameterDirective`, `PrintDirective`, `MeasureDirective`, `RawDirective` | Exact-line unit tests and public export tests |
+| Typed directive builders | Supported | `ParameterDirective`, `OptionsDirective`, `PrintDirective`, `MeasureDirective`, `RawDirective` | Exact-line unit tests and public export tests |
+| Solver options | Supported | `CircuitGraph(..., solver_params={"PACKAGE": {"OPTION": value}})`, `OptionsDirective` | Unit tests for shape validation and ordering; real-Xyce integration test |
 | Operating point analysis | Supported | `simulate_op`, `simulate(".OP")` | Unit and real-Xyce integration tests |
 | Transient analysis | Supported | `simulate_transient`, `simulate(".TRAN ...")` | Unit and real-Xyce integration tests |
 | AC analysis | Supported | `simulate_ac`, `simulate(".AC ...")` | Unit and real-Xyce integration tests |

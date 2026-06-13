@@ -8,6 +8,7 @@ import sys
 EXPECTED_EXPORTS = {
     "CircuitGraph",
     "NetlistCompiler",
+    "OptionsDirective",
     "OutputSpec",
     "ParameterDirective",
     "Resistor",
@@ -66,6 +67,10 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     if parameter_line != ".PARAM RLOAD=1k":
         raise AssertionError("ParameterDirective smoke did not emit the expected .PARAM line.")
 
+    options_line = xyce_py.OptionsDirective("NONLIN", {"RELTOL": "1e-4"}).to_spice()
+    if options_line != ".OPTIONS NONLIN RELTOL=1e-4":
+        raise AssertionError("OptionsDirective smoke did not emit the expected .OPTIONS line.")
+
     return {
         "package_name": package_metadata["Name"],
         "package_version": package_version,
@@ -73,6 +78,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "required_python": package_metadata["Requires-Python"],
         "export_count": len(xyce_py.__all__),
         "netlist_line_count": len(netlist.splitlines()),
+        "options_directive": options_line,
         "parameter_directive": parameter_line,
         "raw_project_outputs": len(raw_project.output_specs),
     }

@@ -4,6 +4,7 @@ import pytest
 
 from xyce_py.directives import (
     MeasureDirective,
+    OptionsDirective,
     ParameterDirective,
     PrintDirective,
     RawDirective,
@@ -31,6 +32,24 @@ def test_parameter_directive_rejects_invalid_names(bad_name):
 def test_parameter_directive_rejects_invalid_values(bad_value):
     with pytest.raises((TypeError, ValueError)):
         ParameterDirective("RLOAD", bad_value)
+
+
+def test_options_directive_emits_exact_options_line_for_package_scoped_values():
+    directive = OptionsDirective("NONLIN", {"RELTOL": 1e-4, "ABSTOL": "1e-12"})
+
+    assert directive.to_spice() == ".OPTIONS NONLIN RELTOL=0.0001 ABSTOL=1e-12"
+
+
+@pytest.mark.parametrize("bad_package", ["", " ", "1bad", "bad-name", None, 3])
+def test_options_directive_rejects_invalid_packages(bad_package):
+    with pytest.raises((TypeError, ValueError)):
+        OptionsDirective(bad_package, {"RELTOL": 1e-4})
+
+
+@pytest.mark.parametrize("bad_values", [{}, [], {"": 1}, {"RELTOL": ""}, {"RELTOL": True}])
+def test_options_directive_rejects_invalid_value_mappings(bad_values):
+    with pytest.raises((TypeError, ValueError)):
+        OptionsDirective("NONLIN", bad_values)
 
 
 def test_print_directive_emits_csv_file_print_line():

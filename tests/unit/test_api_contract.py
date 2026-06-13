@@ -32,6 +32,7 @@ def test___all___exports_resolve_to_expected_objects():
         "MeasureDirective": directives.MeasureDirective,
         "NTerminalDevice": models.NTerminalDevice,
         "NetlistCompiler": compiler.NetlistCompiler,
+        "OptionsDirective": directives.OptionsDirective,
         "OutputArtifact": outputs.OutputArtifact,
         "OutputSpec": outputs.OutputSpec,
         "ParameterDirective": directives.ParameterDirective,
@@ -55,7 +56,7 @@ def test___all___exports_resolve_to_expected_objects():
 
 
 def test_circuit_graph_constructor_resolves_base_out_dir_and_copies_solver_params(tmp_path):
-    original_solver_params = {"reltol": 1e-4}
+    original_solver_params = {"NONLIN": {"RELTOL": 1e-4}}
 
     circuit = CircuitGraph(
         xyce_path="Xyce",
@@ -64,8 +65,10 @@ def test_circuit_graph_constructor_resolves_base_out_dir_and_copies_solver_param
     )
 
     assert circuit.base_out_dir == (tmp_path / "runs").resolve()
-    assert circuit.solver_params == original_solver_params
+    assert circuit.solver_params == {"NONLIN": {"RELTOL": "0.0001"}}
     assert circuit.solver_params is not original_solver_params
+    assert circuit.solver_params["NONLIN"] is not original_solver_params["NONLIN"]
+    assert circuit.spice_directives == [".OPTIONS NONLIN RELTOL=0.0001"]
 
 
 def test_circuit_graph_constructor_uses_find_xyce_executable_when_xyce_path_is_none(

@@ -76,3 +76,20 @@ def test_simulate_op_parameterized_resistor_real_xyce(tmp_path, xyce_path_or_ski
     translated = circuit.simulate_op().translated_waveforms()
 
     assert translated.iloc[0]["V(vout)"] == pytest.approx(5.0, abs=1e-2)
+
+
+def test_simulate_op_solver_params_are_emitted_and_accepted_by_real_xyce(tmp_path, xyce_path_or_skip):
+    circuit = CircuitGraph(
+        xyce_path=xyce_path_or_skip,
+        base_out_dir=str(tmp_path),
+        solver_params={"NONLIN": {"RELTOL": "1e-4"}},
+    )
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_branch("vin", "gnd", [VoltageSource("src", 10.0)])
+    circuit.add_branch("vin", "vout", [Resistor("r1", 1000)])
+    circuit.add_branch("vout", "gnd", [Resistor("r2", 1000)])
+
+    result = circuit.simulate_op()
+
+    assert ".OPTIONS DEVICE GMIN=1e-8\n.OPTIONS NONLIN RELTOL=1e-4" in result.netlist
+    assert result.translated_waveforms().iloc[0]["V(vout)"] == pytest.approx(5.0, abs=1e-2)

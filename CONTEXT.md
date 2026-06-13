@@ -36,6 +36,10 @@ _Avoid_: command, config line
 A typed Python object that emits one exact SPICE directive line while leaving directive internals to Xyce when they are expression-shaped.
 _Avoid_: parser, interpreter
 
+**Solver options**:
+Package-scoped `.OPTIONS` values supplied from Python and emitted into the netlist without interpreting Xyce option semantics.
+_Avoid_: solver config, runtime knobs
+
 **Xyce project**:
 A raw Xyce netlist plus declared output files that can be executed without using `CircuitGraph`.
 _Avoid_: job, raw run

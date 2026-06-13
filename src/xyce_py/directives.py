@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 import re
 from typing import Union
@@ -69,6 +69,36 @@ class ParameterDirective:
 
     def to_spice(self) -> str:
         return f".PARAM {self.name}={self.value}"
+
+
+@dataclass(frozen=True)
+class OptionsDirective:
+    package: str
+    values: Mapping[str, DirectiveValue]
+
+    def __post_init__(self):
+        package = _validate_spice_identifier(self.package, "package")
+        if not isinstance(self.values, Mapping):
+            raise TypeError("values must be a mapping of option names to values.")
+        if not self.values:
+            raise ValueError("values must be a non-empty mapping of option names to values.")
+
+        normalized_values: dict[str, str] = {}
+        for option_name, option_value in self.values.items():
+            option_name = _validate_spice_identifier(option_name, "values key")
+            if option_name in normalized_values:
+                raise ValueError(f"Duplicate option name: {option_name!r}.")
+            normalized_values[option_name] = _format_directive_value(option_value, "values value")
+
+        object.__setattr__(self, "package", package)
+        object.__setattr__(self, "values", normalized_values)
+
+    def to_spice(self) -> str:
+        options = " ".join(
+            f"{option_name}={option_value}"
+            for option_name, option_value in self.values.items()
+        )
+        return f".OPTIONS {self.package} {options}"
 
 
 @dataclass(frozen=True)

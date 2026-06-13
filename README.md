@@ -155,7 +155,7 @@ graph.add_subcircuit(".SUBCKT BUF IN OUT\nR1 OUT IN 1k\n.ENDS")
 Subcircuit definitions are passed through as opaque SPICE text. Xyce validates
 subcircuit internals and arity during simulation.
 
-## Parameters and Directive Builders
+## Parameters, Solver Options, and Directive Builders
 
 Use `add_parameter()` for `.PARAM` values in `CircuitGraph` netlists:
 
@@ -164,12 +164,22 @@ graph.add_parameter("RLOAD", "1k")
 graph.add_branch("vout", "gnd", [Resistor("load", "{RLOAD}")])
 ```
 
+Pass solver options as package-scoped `.OPTIONS` values:
+
+```python
+graph = CircuitGraph(
+    xyce_path="Xyce",
+    solver_params={"NONLIN": {"RELTOL": "1e-4"}},
+)
+```
+
 Directive builders emit exact SPICE directive text while leaving Xyce-specific
 expressions to Xyce:
 
 ```python
-from xyce_py import MeasureDirective, PrintDirective
+from xyce_py import MeasureDirective, OptionsDirective, PrintDirective
 
+options_line = OptionsDirective("NONLIN", {"RELTOL": "1e-4"}).to_spice()
 print_line = PrintDirective("TRAN", ["V(out)"], file="tran.csv").to_spice()
 measure_line = MeasureDirective(
     "TRAN",
@@ -186,6 +196,7 @@ measure_line = MeasureDirective(
 - Each graph may have only one ground node.
 - Branches must contain at least one `CircuitElement`.
 - Device terminal counts must match the device type.
+- `solver_params` must map Xyce option packages to option mappings.
 - Floating subgraphs are rejected before launching Xyce.
 
 If Xyce exits with a non-zero status, `xyce-py` raises `XyceRunError` with the

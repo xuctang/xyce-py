@@ -9,7 +9,7 @@ import networkx as nx
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
 from .compiler import NetlistCompiler
-from .directives import ParameterDirective, PrintDirective
+from .directives import OptionsDirective, ParameterDirective, PrintDirective
 from .engine import run_xyce_netlist, find_xyce_executable
 from .models import CircuitElement, NTerminalDevice, SolveResult
 
@@ -24,18 +24,38 @@ class CircuitTopologyError(RuntimeError):
     pass
 
 
+def _normalize_solver_params(
+    solver_params: Mapping[str, Mapping[str, object]] | None,
+) -> dict[str, dict[str, str]]:
+    if solver_params is None:
+        return {}
+    if not isinstance(solver_params, Mapping):
+        raise TypeError("solver_params must be a mapping from option package names to option mappings.")
+
+    normalized_params: dict[str, dict[str, str]] = {}
+    for package, values in solver_params.items():
+        directive = OptionsDirective(package, values)
+        if directive.package in normalized_params:
+            raise ValueError(f"Duplicate solver option package: {directive.package!r}.")
+        normalized_params[directive.package] = dict(directive.values)
+    return normalized_params
+
+
 class CircuitGraph:
     def __init__(
         self,
         xyce_path: str | None = None,
         base_out_dir: str = "_xyce_runs",
-        solver_params: dict | None = None,
+        solver_params: Mapping[str, Mapping[str, object]] | None = None,
     ):
         self.G = nx.MultiDiGraph()
-        self.spice_directives: list[str] = []
         self.xyce_path = xyce_path or find_xyce_executable()
         self.base_out_dir = Path(base_out_dir).resolve()
-        self.solver_params = dict(solver_params or {})
+        self.solver_params = _normalize_solver_params(solver_params)
+        self.spice_directives: list[str] = [
+            OptionsDirective(package, values).to_spice()
+            for package, values in self.solver_params.items()
+        ]
 
     def add_node(self, node_id: Hashable, is_ground: bool = False):
         if not isinstance(node_id, Hashable):

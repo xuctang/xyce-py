@@ -93,6 +93,22 @@ def test_compile_preserves_directive_then_element_then_device_order():
     assert lines[5].startswith("Q_amp ")
 
 
+def test_compile_places_caller_options_after_generated_default_options():
+    circuit = CircuitGraph(xyce_path="Xyce")
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_model(".MODEL DFAST D(IS=1e-9)")
+    circuit.add_options(".OPTIONS NONLIN RELTOL=1e-4")
+    circuit.add_branch("vin", "gnd", [VoltageSource("src", 5.0)])
+    compiler = NetlistCompiler(circuit.G, circuit.spice_directives)
+
+    lines = compiler.compile().splitlines()
+
+    assert lines[1] == ".MODEL DFAST D(IS=1e-9)"
+    assert lines[2] == ".OPTIONS DEVICE GMIN=1e-8"
+    assert lines[3] == ".OPTIONS NONLIN RELTOL=1e-4"
+    assert lines[4].startswith("V_src ")
+
+
 def test_compile_handles_device_only_grounded_graph():
     circuit = CircuitGraph(xyce_path="Xyce")
     circuit.add_node("gnd", is_ground=True)

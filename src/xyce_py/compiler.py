@@ -6,6 +6,11 @@ from types import MappingProxyType
 
 import networkx as nx
 
+from .directives import OptionsDirective
+
+
+_DEFAULT_OPTIONS_DIRECTIVE = OptionsDirective("DEVICE", {"GMIN": "1e-8"}).to_spice()
+
 
 @dataclass(frozen=True)
 class NetlistBody:
@@ -64,9 +69,15 @@ class NetlistCompiler:
 
         self._build_user_spice_node_mappings()
 
+        option_directives = [directive for directive in self._spice_directives if directive.startswith(".OPTIONS")]
+        non_option_directives = [
+            directive for directive in self._spice_directives if not directive.startswith(".OPTIONS")
+        ]
+
         netlist_lines = ["* Generated Circuit"]
-        netlist_lines.extend(self._spice_directives)
-        netlist_lines.append(".OPTIONS DEVICE GMIN=1e-8")
+        netlist_lines.extend(non_option_directives)
+        netlist_lines.append(_DEFAULT_OPTIONS_DIRECTIVE)
+        netlist_lines.extend(option_directives)
         netlist_lines.extend(self._compile_element_lines())
         netlist_lines.extend(self._compile_device_lines())
         return netlist_lines
