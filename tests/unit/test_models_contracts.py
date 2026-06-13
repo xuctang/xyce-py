@@ -14,6 +14,8 @@ from xyce_py.models import (
     CurrentSource,
     Diode,
     Inductor,
+    RawNTerminalDevice,
+    RawTwoTerminalElement,
     Resistor,
     SolveResult,
     Subcircuit,
@@ -131,6 +133,31 @@ def test_subcircuit_terminal_count_contract(bad_terminals):
 def test_behavioral_source_accepts_only_exact_voltage_or_current_source_type(source_type):
     with pytest.raises((TypeError, ValueError)):
         BehavioralSource("b1", "V(in)", source_type)
+
+
+def test_raw_two_terminal_element_reuses_spice_node_validation():
+    element = RawTwoTerminalElement("raw", "R_$name $node_pos $node_neg 1k")
+
+    with pytest.raises(TypeError, match="node_pos must be a string"):
+        element.to_spice(1, "0")
+
+
+def test_raw_n_terminal_device_reuses_terminal_arity_validation():
+    device = RawNTerminalDevice(
+        "raw",
+        "MODEL",
+        terminals=2,
+        template="X_$name $n0 $n1 $model_name",
+    )
+
+    with pytest.raises(ValueError, match="exactly 2 node names"):
+        device.to_spice(["N_1"])
+
+
+@pytest.mark.parametrize("terminals", [0, -1, True, "2"])
+def test_raw_n_terminal_device_rejects_invalid_terminal_counts(terminals):
+    with pytest.raises((TypeError, ValueError)):
+        RawNTerminalDevice("raw", "MODEL", terminals=terminals, template="X_$name $n0 $model_name")
 
 
 def test_to_spice_calls_do_not_mutate_model_dataclass_state():

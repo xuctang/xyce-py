@@ -3,7 +3,13 @@ from __future__ import annotations
 import pytest
 
 from xyce_py.graph import CircuitGraph
-from xyce_py.models import CurrentSource, Diode, Resistor, VoltageSource
+from xyce_py.models import (
+    CurrentSource,
+    Diode,
+    RawTwoTerminalElement,
+    Resistor,
+    VoltageSource,
+)
 
 
 pytestmark = pytest.mark.xyce
@@ -76,6 +82,28 @@ def test_simulate_op_parameterized_resistor_real_xyce(tmp_path, xyce_path_or_ski
     translated = circuit.simulate_op().translated_waveforms()
 
     assert translated.iloc[0]["V(vout)"] == pytest.approx(5.0, abs=1e-2)
+
+
+def test_simulate_op_raw_two_terminal_template_real_xyce(tmp_path, xyce_path_or_skip):
+    circuit = CircuitGraph(xyce_path=xyce_path_or_skip, base_out_dir=str(tmp_path))
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_parameter("RLOAD", "1000")
+    circuit.add_branch("vin", "gnd", [VoltageSource("src", 10.0)])
+    circuit.add_branch(
+        "vin",
+        "vout",
+        [RawTwoTerminalElement("r1", "R_$name $node_pos $node_neg {RLOAD}")],
+    )
+    circuit.add_branch(
+        "vout",
+        "gnd",
+        [RawTwoTerminalElement("r2", "R_$name $node_pos $node_neg {RLOAD}")],
+    )
+
+    result = circuit.simulate_op()
+
+    assert "R_r1 N_1 N_2 {RLOAD}" in result.netlist
+    assert result.translated_waveforms().iloc[0]["V(vout)"] == pytest.approx(5.0, abs=1e-2)
 
 
 def test_simulate_op_solver_params_are_emitted_and_accepted_by_real_xyce(tmp_path, xyce_path_or_skip):

@@ -13,6 +13,8 @@ EXPECTED_EXPORTS = {
     "OptionsDirective",
     "OutputSpec",
     "ParameterDirective",
+    "RawNTerminalDevice",
+    "RawTwoTerminalElement",
     "parse_measurements",
     "Resistor",
     "SweepParameter",
@@ -73,6 +75,22 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     raw_project = build_raw_netlist_project(xyce_py)
     if raw_project.output_specs[0].path != "raw.csv":
         raise AssertionError("Raw-project smoke did not preserve the declared output path.")
+
+    raw_element_line = xyce_py.RawTwoTerminalElement(
+        "load",
+        "R_$name $node_pos $node_neg 1k",
+    ).to_spice("N_1", "0")
+    if raw_element_line != "R_load N_1 0 1k":
+        raise AssertionError("RawTwoTerminalElement smoke did not emit the expected element line.")
+
+    raw_device_line = xyce_py.RawNTerminalDevice(
+        "amp",
+        "AMP_MODEL",
+        terminals=2,
+        template="X_$name $n0 $n1 $model_name",
+    ).to_spice(["N_1", "N_2"])
+    if raw_device_line != "X_amp N_1 N_2 AMP_MODEL":
+        raise AssertionError("RawNTerminalDevice smoke did not emit the expected device line.")
 
     xdm_translator = xyce_py.XdmTranslator("xdm")
     if xdm_translator.xdm_path != "xdm":

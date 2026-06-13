@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from collections.abc import Hashable, Mapping
+from dataclasses import dataclass, field
+import string
 from types import MappingProxyType
 from typing import Optional, Union
 
@@ -42,6 +43,33 @@ def _validate_spice_nodes(node_pos: object, node_neg: object) -> tuple[str, str]
         _validate_non_empty_string(node_pos, "node_pos"),
         _validate_non_empty_string(node_neg, "node_neg"),
     )
+
+
+def _template_has_placeholder(template: str, placeholder: str) -> bool:
+    return f"${placeholder}" in template or f"${{{placeholder}}}" in template
+
+
+def _validate_raw_template(
+    template: object,
+    required_placeholders: list[str],
+    substitutions: Mapping[str, str],
+) -> str:
+    template = _validate_non_empty_string(template, "template")
+    missing_placeholders = [
+        placeholder
+        for placeholder in required_placeholders
+        if not _template_has_placeholder(template, placeholder)
+    ]
+    if missing_placeholders:
+        raise ValueError(
+            "template must contain placeholders: "
+            + ", ".join(f"${placeholder}" for placeholder in missing_placeholders)
+        )
+    try:
+        string.Template(template).substitute(substitutions)
+    except (KeyError, ValueError) as exc:
+        raise ValueError(f"template contains an invalid or unknown placeholder: {exc}") from exc
+    return template
 
 
 def _validate_mapped_nodes(mapped_nodes: object, expected_terminals: int) -> list[str]:
@@ -238,6 +266,67 @@ class BehavioralSource(CircuitElement):
     def to_spice(self, node_pos: str, node_neg: str) -> str:
         node_pos, node_neg = _validate_spice_nodes(node_pos, node_neg)
         return f"B_{self.name} {node_pos} {node_neg} {self.source_type}={{{self.equation}}}"
+
+
+@dataclass
+class RawTwoTerminalElement(CircuitElement):
+    template: str
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.template = _validate_raw_template(
+            self.template,
+            ["node_pos", "node_neg"],
+            {
+                "name": self.name,
+                "node_pos": "N_POS",
+                "node_neg": "N_NEG",
+            },
+        )
+
+    def to_spice(self, node_pos: str, node_neg: str) -> str:
+        node_pos, node_neg = _validate_spice_nodes(node_pos, node_neg)
+        return string.Template(self.template).substitute(
+            name=self.name,
+            node_pos=node_pos,
+            node_neg=node_neg,
+        )
+
+
+@dataclass
+class RawNTerminalDevice(NTerminalDevice):
+    terminals: int
+    template: str
+
+    def __post_init__(self):
+        super().__post_init__()
+        if isinstance(self.terminals, bool) or not isinstance(self.terminals, int):
+            raise TypeError("terminals must be an integer.")
+        if self.terminals <= 0:
+            raise ValueError("terminals must be a positive integer.")
+        substitutions = {
+            "name": self.name,
+            "model_name": self.model_name,
+            **{f"n{index}": f"N_{index}" for index in range(self.terminals)},
+        }
+        self.template = _validate_raw_template(
+            self.template,
+            [f"n{index}" for index in range(self.terminals)],
+            substitutions,
+        )
+
+    @property
+    def expected_terminals(self) -> int:
+        return self.terminals
+
+    def to_spice(self, mapped_nodes: list[str]) -> str:
+        mapped_nodes = self._validated_mapped_nodes(mapped_nodes)
+        substitutions = {
+            "name": self.name,
+            "model_name": self.model_name,
+            **{f"n{index}": node for index, node in enumerate(mapped_nodes)},
+        }
+        return string.Template(self.template).substitute(substitutions)
 
 
 @dataclass

@@ -15,6 +15,8 @@ from xyce_py.models import (
     Inductor,
     MOSFET,
     NTerminalDevice,
+    RawNTerminalDevice,
+    RawTwoTerminalElement,
     Resistor,
     Subcircuit,
     VoltageSource,
@@ -114,6 +116,43 @@ def test_subcircuit_terminal_order_and_model_name_are_preserved():
     device = Subcircuit("u1", "LOWPASS_MODEL", terminals=4)
 
     assert device.to_spice(["n1", "n2", "n3", "n4"]) == "X_u1 n1 n2 n3 n4 LOWPASS_MODEL"
+
+
+def test_raw_two_terminal_element_substitutes_name_and_spice_nodes():
+    element = RawTwoTerminalElement("load", "R_$name $node_pos $node_neg {RLOAD}")
+
+    assert element.to_spice("N_1", "0") == "R_load N_1 0 {RLOAD}"
+
+
+def test_raw_n_terminal_device_substitutes_model_and_ordered_spice_nodes():
+    device = RawNTerminalDevice(
+        "xamp",
+        "AMP_MODEL",
+        terminals=3,
+        template="X_$name $n0 $n1 $n2 $model_name",
+    )
+
+    assert device.expected_terminals == 3
+    assert device.to_spice(["IN", "OUT", "0"]) == "X_xamp IN OUT 0 AMP_MODEL"
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: RawTwoTerminalElement("bad", "R_$name $node_pos 0 1k"),
+        lambda: RawTwoTerminalElement("bad", "R_$name $node_pos $missing 1k"),
+        lambda: RawNTerminalDevice("bad", "MODEL", terminals=2, template="X_$name $n0 MODEL"),
+        lambda: RawNTerminalDevice(
+            "bad",
+            "MODEL",
+            terminals=2,
+            template="X_$name $n0 $n1 $missing",
+        ),
+    ],
+)
+def test_raw_template_models_reject_invalid_templates(factory):
+    with pytest.raises(ValueError):
+        factory()
 
 
 def test_to_spice_does_not_mutate_model_instances():

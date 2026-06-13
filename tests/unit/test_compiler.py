@@ -4,7 +4,14 @@ import pytest
 
 from xyce_py.compiler import NetlistBody, NetlistCompiler
 from xyce_py.graph import CircuitGraph
-from xyce_py.models import BJT, Capacitor, Resistor, VoltageSource
+from xyce_py.models import (
+    BJT,
+    Capacitor,
+    RawNTerminalDevice,
+    RawTwoTerminalElement,
+    Resistor,
+    VoltageSource,
+)
 
 
 pytestmark = pytest.mark.unit
@@ -119,6 +126,32 @@ def test_compile_handles_device_only_grounded_graph():
 
     assert "Q_amp N_1 N_2 0 QMOD" in netlist
     assert netlist.endswith(".END\n")
+
+
+def test_compile_includes_raw_template_element_and_device_lines():
+    circuit = CircuitGraph(xyce_path="Xyce")
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_branch("vin", "gnd", [VoltageSource("src", 5.0)])
+    circuit.add_branch(
+        "vin",
+        "vout",
+        [RawTwoTerminalElement("load", "R_$name $node_pos $node_neg 1k")],
+    )
+    circuit.add_device(
+        RawNTerminalDevice(
+            "amp",
+            "AMP_MODEL",
+            terminals=2,
+            template="X_$name $n0 $n1 $model_name",
+        ),
+        ["vin", "vout"],
+    )
+    compiler = NetlistCompiler(circuit.G, circuit.spice_directives)
+
+    netlist = compiler.compile()
+
+    assert "R_load N_1 N_2 1k" in netlist
+    assert "X_amp N_1 N_2 AMP_MODEL" in netlist
 
 
 def test_compile_handles_directive_only_grounded_graph():

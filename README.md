@@ -15,6 +15,8 @@ generation, process execution, result loading, and node-name translation.
 - Built-in models for common elements: resistors, capacitors, inductors, voltage
   sources, current sources, diodes, BJTs, MOSFETs, behavioral sources, and
   subcircuit instances.
+- Raw template devices for exact Xyce element lines that still need graph-owned
+  node-name translation.
 - A `NetlistCompiler` that converts the graph into a Xyce/SPICE-style netlist.
 - Simulation helpers for operating point, transient, AC, and DC analyses.
 - Typed directive builders for common outer contracts such as `.PARAM`,
@@ -265,6 +267,33 @@ graph.add_subcircuit(".SUBCKT BUF IN OUT\nR1 OUT IN 1k\n.ENDS")
 
 Subcircuit definitions are passed through as opaque SPICE text. Xyce validates
 subcircuit internals and arity during simulation.
+
+Use raw template devices when Xyce already owns the exact element syntax but the
+Python graph should still own topology and node-name translation:
+
+```python
+from xyce_py import RawNTerminalDevice, RawTwoTerminalElement
+
+graph.add_branch(
+    "vin",
+    "vout",
+    [RawTwoTerminalElement("load", "R_$name $node_pos $node_neg {RLOAD}")],
+)
+graph.add_device(
+    RawNTerminalDevice(
+        "amp",
+        "AMP_MODEL",
+        terminals=2,
+        template="X_$name $n0 $n1 $model_name",
+    ),
+    ["vin", "vout"],
+)
+```
+
+`RawTwoTerminalElement` requires `$node_pos` and `$node_neg`.
+`RawNTerminalDevice` requires one ordered placeholder per terminal: `$n0`,
+`$n1`, and so on. Both support `$name`; raw multi-terminal devices also support
+`$model_name`.
 
 ## Parameters, Solver Options, and Directive Builders
 

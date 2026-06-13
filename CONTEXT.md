@@ -28,6 +28,10 @@ _Avoid_: edge, wire
 A multi-terminal circuit element represented by an internal device node and ordered terminal links in the topology.
 _Avoid_: component, part
 
+**Raw template device**:
+A caller-owned Xyce element template that receives generated SPICE node names from the circuit topology without parsing device syntax.
+_Avoid_: universal model parser, component catalog
+
 **SPICE directive**:
 Raw netlist text for Xyce features such as `.MODEL`, `.OPTIONS`, and `.SUBCKT` that is carried through without parsing internals.
 _Avoid_: command, config line
