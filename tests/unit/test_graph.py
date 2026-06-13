@@ -4,8 +4,11 @@ from enum import Enum
 
 import pytest
 
+from xyce_py.compiler import NetlistBody
 from xyce_py.graph import CircuitGraph, CircuitTopologyError
 from xyce_py.models import BJT, Resistor
+from xyce_py.netlists import XyceProject
+from xyce_py.outputs import OutputSpec
 
 
 pytestmark = pytest.mark.unit
@@ -213,3 +216,58 @@ def test_add_subcircuit_rejects_invalid_directives():
 
     with pytest.raises(ValueError, match="subckt_string must end with '.ENDS'."):
         circuit.add_subcircuit(".SUBCKT BUF IN OUT\nR1 OUT IN 1k")
+
+
+def test_compile_body_returns_compiler_body_with_node_mappings(build_voltage_divider):
+    circuit = build_voltage_divider()
+
+    body = circuit.compile_body()
+
+    assert isinstance(body, NetlistBody)
+    assert body.user_to_spice_node["gnd"] == "0"
+    assert body.user_to_spice_node["vin"] == "N_1"
+    assert body.user_to_spice_node["vout"] == "N_2"
+    assert ".END" not in body.lines
+
+
+def test_compile_project_builds_raw_project_for_advanced_directives(build_voltage_divider):
+    circuit = build_voltage_divider()
+    body = circuit.compile_body()
+
+    project = circuit.compile_project(
+        "noise-project",
+        [
+            f".NOISE V({body.user_to_spice_node['vout']}) V_src DEC 10 1 1e6",
+            ".PRINT NOISE FORMAT=CSV FILE=noise.csv ONOISE INOISE",
+        ],
+        output_specs=[OutputSpec.csv("noise", "noise.csv")],
+    )
+
+    assert isinstance(project, XyceProject)
+    assert ".NOISE V(N_2) V_src DEC 10 1 1e6" in project.netlist_content
+    assert ".PRINT NOISE FORMAT=CSV FILE=noise.csv ONOISE INOISE" in project.netlist_content
+    assert project.netlist_content.count(".END") == 1
+    assert project.netlist_content.endswith(".END\n")
+    assert project.output_specs == (OutputSpec.csv("noise", "noise.csv"),)
+
+
+@pytest.mark.parametrize(
+    ("simulation_directives", "error_type", "message"),
+    [
+        (".OP", TypeError, "simulation_directives must be a non-empty iterable"),
+        ([], ValueError, "simulation_directives must be a non-empty iterable"),
+        ([".OP", ""], ValueError, "simulation_directives item must be a non-empty string"),
+        ([".OP", ".END"], ValueError, "must not include '.END'"),
+        ([".OP", "* comment\n.END"], ValueError, "must not include '.END'"),
+    ],
+)
+def test_compile_project_rejects_invalid_simulation_directives(
+    build_voltage_divider,
+    simulation_directives,
+    error_type,
+    message,
+):
+    circuit = build_voltage_divider()
+
+    with pytest.raises(error_type, match=message):
+        circuit.compile_project("bad-project", simulation_directives)

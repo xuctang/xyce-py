@@ -80,6 +80,10 @@ _Avoid_: metric, postprocess value
 The compiled netlist lines before simulation analysis directives, `.PRINT`, and `.END` are appended.
 _Avoid_: partial netlist, template
 
+**Compiled Xyce project**:
+A `CircuitGraph` topology compiled into an `XyceProject` by appending caller-owned Xyce directive lines and a package-owned `.END`.
+_Avoid_: simulated graph shortcut, directive parser
+
 **Xyce execution**:
 The subprocess run that writes a netlist, invokes Xyce, reads waveform CSV output, and reports execution failures.
 _Avoid_: solver call, run wrapper

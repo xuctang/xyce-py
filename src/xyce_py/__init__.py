@@ -1,4 +1,4 @@
-from .compiler import NetlistCompiler
+from .compiler import NetlistBody, NetlistCompiler
 from .directives import MeasureDirective, OptionsDirective, ParameterDirective, PrintDirective, RawDirective
 from .engine import XyceExecutionResult, XyceRunError, run_xyce_netlist, find_xyce_executable
 from .graph import CircuitGraph, CircuitTopologyError
@@ -50,6 +50,7 @@ __all__ = [
     "MeasurementResult",
     "MonteCarloParameter",
     "NTerminalDevice",
+    "NetlistBody",
     "NetlistCompiler",
     "NormalDistribution",
     "OptionsDirective",

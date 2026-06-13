@@ -134,6 +134,27 @@ result = graph.simulate_dc("V_supply", "0", "5", "0.5")
 You can also call `graph.simulate(".OP")`, `graph.simulate(".TRAN ...")`,
 `graph.simulate(".AC ...")`, or `graph.simulate(".DC ...")` directly.
 
+For advanced Xyce analyses, keep `simulate()` on its strict helper path and
+compile the graph into a raw project instead:
+
+```python
+from xyce_py import OutputSpec
+
+body = graph.compile_body()
+project = graph.compile_project(
+    "noise-analysis",
+    [
+        f".NOISE V({body.user_to_spice_node['vout']}) V_supply DEC 10 1 1e6",
+        ".PRINT NOISE FORMAT=CSV FILE=noise.csv ONOISE INOISE",
+    ],
+    output_specs=(OutputSpec.csv("noise", "noise.csv"),),
+)
+result = project.run(xyce_path="Xyce")
+```
+
+`compile_project()` does not parse advanced directive semantics. It validates the
+Python-side directive list, appends `.END`, and leaves analysis syntax to Xyce.
+
 ## Run Raw Xyce Netlists
 
 Use `XyceProject` when you already have an exact Xyce netlist, need an advanced

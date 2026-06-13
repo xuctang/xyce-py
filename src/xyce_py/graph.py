@@ -8,10 +8,11 @@ import warnings
 import networkx as nx
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
-from .compiler import NetlistCompiler
+from .compiler import NetlistBody, NetlistCompiler
 from .directives import MeasureDirective, OptionsDirective, ParameterDirective, PrintDirective
 from .engine import run_xyce_netlist, find_xyce_executable
 from .models import CircuitElement, NTerminalDevice, SolveResult
+from .netlists import XyceProject
 from .outputs import OutputSpec, collect_output_artifacts, normalize_output_specs
 
 
@@ -40,6 +41,34 @@ def _normalize_solver_params(
             raise ValueError(f"Duplicate solver option package: {directive.package!r}.")
         normalized_params[directive.package] = dict(directive.values)
     return normalized_params
+
+
+def _contains_top_level_end(directive_text: str) -> bool:
+    for line in directive_text.splitlines():
+        stripped_line = line.strip()
+        if not stripped_line or stripped_line.startswith("*"):
+            continue
+        if stripped_line.split(maxsplit=1)[0].upper() == ".END":
+            return True
+    return False
+
+
+def _normalize_project_directives(simulation_directives: object) -> tuple[str, ...]:
+    if isinstance(simulation_directives, str) or not isinstance(simulation_directives, Iterable):
+        raise TypeError("simulation_directives must be a non-empty iterable of strings.")
+
+    directives = tuple(
+        _validate_non_empty_string(directive, "simulation_directives item").strip()
+        for directive in simulation_directives
+    )
+    if not directives:
+        raise ValueError("simulation_directives must be a non-empty iterable of strings.")
+
+    for directive in directives:
+        if _contains_top_level_end(directive):
+            raise ValueError("simulation_directives must not include '.END'; compile_project appends it.")
+
+    return directives
 
 
 class CircuitGraph:
@@ -146,6 +175,25 @@ class CircuitGraph:
         # to diagnose at execution time instead of being parsed heuristically.
         self.spice_directives.append(directive)
 
+    def compile_body(self) -> NetlistBody:
+        self._validate_topology()
+        return NetlistCompiler(self.G, self.spice_directives).compile_body()
+
+    def compile_project(
+        self,
+        name: str,
+        simulation_directives: Iterable[str],
+        output_specs: Iterable[OutputSpec] = (),
+    ) -> XyceProject:
+        compiled_body = self.compile_body()
+        directives = _normalize_project_directives(simulation_directives)
+        netlist_content = "\n".join([*compiled_body.lines, *directives, ".END"]) + "\n"
+        return XyceProject(
+            name,
+            netlist_content,
+            output_specs=tuple(output_specs),
+        )
+
     def simulate(
         self,
         analysis_cmd: str,
@@ -167,9 +215,7 @@ class CircuitGraph:
             print_vars,
         )
 
-        self._validate_topology()
-        compiler = NetlistCompiler(self.G, self.spice_directives)
-        compiled_body = compiler.compile_body()
+        compiled_body = self.compile_body()
         if compiled_body.expanded_graph is None:
             raise RuntimeError("Compiler did not produce an expanded graph.")
         netlist_lines = list(compiled_body.lines)

@@ -7,6 +7,7 @@ import sys
 
 EXPECTED_EXPORTS = {
     "CircuitGraph",
+    "NetlistBody",
     "NetlistCompiler",
     "MonteCarloParameter",
     "NormalDistribution",
@@ -45,6 +46,22 @@ def build_raw_netlist_project(package_module):
     )
 
 
+def build_compiled_graph_project(package_module):
+    circuit = package_module.CircuitGraph(xyce_path="Xyce")
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_branch("vin", "gnd", [package_module.VoltageSource("supply", 5.0)])
+    circuit.add_branch("vin", "vout", [package_module.Resistor("r1", 1000)])
+    body = circuit.compile_body()
+    return circuit.compile_project(
+        "compiled-graph-smoke",
+        [
+            ".OP",
+            f".PRINT DC FORMAT=CSV FILE=compiled.csv V({body.user_to_spice_node['vout']})",
+        ],
+        output_specs=(package_module.OutputSpec.csv("waveforms", "compiled.csv"),),
+    )
+
+
 def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     import xyce_py
     import xyce_py.cli
@@ -75,6 +92,10 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     raw_project = build_raw_netlist_project(xyce_py)
     if raw_project.output_specs[0].path != "raw.csv":
         raise AssertionError("Raw-project smoke did not preserve the declared output path.")
+
+    compiled_project = build_compiled_graph_project(xyce_py)
+    if ".PRINT DC FORMAT=CSV FILE=compiled.csv V(N_2)" not in compiled_project.netlist_content:
+        raise AssertionError("Compiled graph project smoke did not preserve graph node translation.")
 
     raw_element_line = xyce_py.RawTwoTerminalElement(
         "load",
@@ -140,6 +161,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "parameter_directive": parameter_line,
         "parsed_measurements": len(measurements),
         "raw_project_outputs": len(raw_project.output_specs),
+        "compiled_project_outputs": len(compiled_project.output_specs),
         "monte_carlo_points": len(monte_carlo.points()),
         "sweep_points": len(sweep.points()),
         "xdm_path": xdm_translator.xdm_path,

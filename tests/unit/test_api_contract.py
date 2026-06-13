@@ -33,6 +33,7 @@ def test___all___exports_resolve_to_expected_objects():
         "MeasurementResult": measurements.MeasurementResult,
         "MonteCarloParameter": sweeps.MonteCarloParameter,
         "NTerminalDevice": models.NTerminalDevice,
+        "NetlistBody": compiler.NetlistBody,
         "NetlistCompiler": compiler.NetlistCompiler,
         "NormalDistribution": sweeps.NormalDistribution,
         "OptionsDirective": directives.OptionsDirective,
