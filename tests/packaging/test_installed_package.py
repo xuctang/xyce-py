@@ -58,6 +58,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     required_package_sources = [
         Path("src/xyce_py/__init__.py"),
         Path("src/xyce_py/__main__.py"),
+        Path("src/xyce_py/_solutions.py"),
         Path("src/xyce_py/cli.py"),
         Path("src/xyce_py/compiler.py"),
         Path("src/xyce_py/directives.py"),
@@ -89,6 +90,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
 
     assert "xyce_py/__init__.py" in wheel_names
     assert "xyce_py/__main__.py" in wheel_names
+    assert "xyce_py/_solutions.py" in wheel_names
     assert "xyce_py/cli.py" in wheel_names
     assert "xyce_py/compiler.py" in wheel_names
     assert "xyce_py/directives.py" in wheel_names
@@ -110,6 +112,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     assert f"{sdist_root}/LICENSE" in sdist_names
     assert f"{sdist_root}/src/xyce_py/__init__.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/__main__.py" in sdist_names
+    assert f"{sdist_root}/src/xyce_py/_solutions.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/cli.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/compiler.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/directives.py" in sdist_names

@@ -239,6 +239,55 @@ def test_translated_waveforms_handles_non_string_and_duplicate_columns():
     assert list(original.columns) == ["V(N_1)", "V(N_1)", 7]
 
 
+@pytest.mark.parametrize("row", [True, "0", 0.0])
+def test_solved_graph_rejects_invalid_row_type(row):
+    result = SolveResult(
+        original_graph=nx.MultiDiGraph(),
+        expanded_graph=nx.MultiDiGraph(),
+        netlist="* test\n.END\n",
+        waveforms=pd.DataFrame({"V(N_1)": [1.0]}),
+        solve_time_sec=0.0,
+        stdout="",
+        spice_to_user_node={"N_1": "vin"},
+    )
+
+    with pytest.raises(TypeError, match="row must be an integer"):
+        result.solved_graph(row=row)
+
+
+@pytest.mark.parametrize("row", [-1, 1])
+def test_solved_graph_rejects_out_of_range_row(row):
+    result = SolveResult(
+        original_graph=nx.MultiDiGraph(),
+        expanded_graph=nx.MultiDiGraph(),
+        netlist="* test\n.END\n",
+        waveforms=pd.DataFrame({"V(N_1)": [1.0]}),
+        solve_time_sec=0.0,
+        stdout="",
+        spice_to_user_node={"N_1": "vin"},
+    )
+
+    with pytest.raises(IndexError, match="row is out of range"):
+        result.solved_graph(row=row)
+
+
+def test_solved_graph_rejects_existing_solved_voltage_attribute():
+    original_graph = nx.MultiDiGraph()
+    original_graph.add_node("vin", solved_voltage=3.0)
+    result = SolveResult(
+        original_graph=original_graph,
+        expanded_graph=nx.MultiDiGraph(),
+        netlist="* test\n.END\n",
+        waveforms=pd.DataFrame({"V(N_1)": [1.0]}),
+        solve_time_sec=0.0,
+        stdout="",
+        spice_to_user_node={"N_1": "vin"},
+    )
+
+    with pytest.raises(RuntimeError, match="Attribute 'solved_voltage' already exists"):
+        result.solved_graph()
+
+
 def test_solve_result_measurements_rejects_non_text_output(tmp_path):
     result = SolveResult(
         original_graph=nx.MultiDiGraph(),

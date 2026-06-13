@@ -13,6 +13,7 @@ import pandas as pd
 from ._validation import validate_non_empty_string as _validate_non_empty_string
 from .measurements import MeasurementResult, parse_measurements
 from .outputs import OutputArtifact
+from ._solutions import node_voltage_updates_from_waveforms
 
 
 ValueLike = Union[str, float]
@@ -349,6 +350,23 @@ class SolveResult:
             self._translated_column_name(column) for column in translated_waveforms.columns
         ]
         return translated_waveforms
+
+    def solved_graph(self, row: int = 0) -> nx.MultiDiGraph:
+        solved_graph = self.original_graph.copy()
+        node_voltage_updates = node_voltage_updates_from_waveforms(
+            self.waveforms,
+            self.spice_to_user_node,
+            row,
+        )
+        for user_node_id in node_voltage_updates:
+            if "solved_voltage" in solved_graph.nodes[user_node_id]:
+                raise RuntimeError(
+                    "Attribute 'solved_voltage' already exists on node."
+                )
+
+        for user_node_id, value in node_voltage_updates.items():
+            solved_graph.nodes[user_node_id]["solved_voltage"] = value
+        return solved_graph
 
     def _translated_column_name(self, column: object) -> object:
         if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):

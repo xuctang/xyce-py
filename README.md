@@ -107,6 +107,19 @@ with TemporaryDirectory() as tmpdir:
 `result.translated_waveforms()` returns a copy with voltage columns translated
 back to the original user node names, such as `V(vin)` and `V(vout)`.
 
+`result.solved_graph(row=0)` returns a copy of the input topology annotated with
+solved node voltages for the selected waveform row:
+
+```python
+solved = result.solved_graph(row=0)
+print(solved.nodes["vout"]["solved_voltage"])
+```
+
+The waveform `DataFrame` remains the canonical numeric result, especially for
+time-series, frequency sweeps, and branch/device current columns. The solved
+graph is an optional topology projection for node voltage inspection and
+visualization.
+
 Extra Xyce output files can be declared when the run directory is kept:
 
 ```python
@@ -121,6 +134,22 @@ result = graph.simulate_transient(
 )
 print(result.measurements()["MAX_OUT"].value)
 ```
+
+## Input Graph Contract
+
+The public topology input is `CircuitGraph`. A `CircuitGraph` owns an internal
+`networkx.MultiDiGraph`, exposed as `graph.G` for inspection and low-level
+compiler use.
+
+`xyce-py` does not accept arbitrary external `nx.Graph`, `nx.DiGraph`, or
+`nx.MultiGraph` instances as simulation input. Use `CircuitGraph.add_node()`,
+`add_branch()`, and `add_device()` so topology data has the attributes required
+by the compiler. `MultiDiGraph` is used because circuits need parallel branches,
+directed terminal polarity, and compiler-expanded internal nodes.
+
+If a future NetworkX import interface is added, it should be a strict
+`CircuitGraph.from_networkx()` adapter with an explicit schema and fail-fast
+validation. It should not guess circuit meaning from arbitrary graph attributes.
 
 ## Supported Analysis Helpers
 

@@ -8,6 +8,7 @@ import warnings
 import networkx as nx
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
+from ._solutions import node_voltage_updates_from_waveforms
 from .compiler import NetlistBody, NetlistCompiler
 from .directives import MeasureDirective, OptionsDirective, ParameterDirective, PrintDirective
 from .engine import run_xyce_netlist, find_xyce_executable
@@ -449,20 +450,16 @@ class CircuitGraph:
         return measurement_lines
 
     def _apply_inplace_solution(self, waveforms, spice_to_user_node: Mapping[str, object]):
-        node_voltage_updates: dict[object, object] = {}
-        solution_row = waveforms.iloc[0]
-        for column, value in solution_row.items():
-            if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
-                continue
-            spice_id = column[2:-1]
-            if spice_id == "0" or spice_id not in spice_to_user_node:
-                continue
-            user_node_id = spice_to_user_node[spice_id]
+        node_voltage_updates = node_voltage_updates_from_waveforms(
+            waveforms,
+            spice_to_user_node,
+            row=0,
+        )
+        for user_node_id in node_voltage_updates:
             if "solved_voltage" in self.G.nodes[user_node_id]:
                 raise RuntimeError(
                     "Attribute 'solved_voltage' already exists on node. Use inplace=False."
                 )
-            node_voltage_updates[user_node_id] = value
 
         for user_node_id, value in node_voltage_updates.items():
             self.G.nodes[user_node_id]["solved_voltage"] = value

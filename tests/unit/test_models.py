@@ -216,6 +216,57 @@ def test_translated_waveforms_leaves_unmapped_voltage_columns_unchanged():
     assert list(translated.columns) == ["V(vin)", "V(N_999)"]
 
 
+def test_solved_graph_returns_copy_with_node_voltage_annotations():
+    original_graph = nx.MultiDiGraph()
+    original_graph.add_node("gnd", is_ground=True)
+    original_graph.add_node("vin")
+    original_graph.add_node("vout")
+    waveforms = pd.DataFrame(
+        {
+            "V(N_1)": [10.0],
+            "V(N_2)": [5.0],
+            "V(0)": [0.0],
+            "V(N_999)": [99.0],
+            "I(V_supply)": [0.01],
+        }
+    )
+    result = SolveResult(
+        original_graph=original_graph,
+        expanded_graph=nx.MultiDiGraph(),
+        netlist="* test\n.END\n",
+        waveforms=waveforms,
+        solve_time_sec=0.0,
+        stdout="",
+        spice_to_user_node={"N_1": "vin", "N_2": "vout", "0": "gnd"},
+    )
+
+    solved_graph = result.solved_graph()
+
+    assert solved_graph is not original_graph
+    assert solved_graph.nodes["vin"]["solved_voltage"] == 10.0
+    assert solved_graph.nodes["vout"]["solved_voltage"] == 5.0
+    assert "solved_voltage" not in solved_graph.nodes["gnd"]
+    assert "solved_voltage" not in original_graph.nodes["vin"]
+
+
+def test_solved_graph_uses_selected_waveform_row():
+    original_graph = nx.MultiDiGraph()
+    original_graph.add_node("vout")
+    result = SolveResult(
+        original_graph=original_graph,
+        expanded_graph=nx.MultiDiGraph(),
+        netlist="* test\n.END\n",
+        waveforms=pd.DataFrame({"TIME": [0.0, 1.0], "V(N_1)": [1.0, 2.0]}),
+        solve_time_sec=0.0,
+        stdout="",
+        spice_to_user_node={"N_1": "vout"},
+    )
+
+    solved_graph = result.solved_graph(row=1)
+
+    assert solved_graph.nodes["vout"]["solved_voltage"] == 2.0
+
+
 def test_abstract_base_classes_cannot_be_instantiated():
     with pytest.raises(TypeError):
         CircuitElement("x1")
