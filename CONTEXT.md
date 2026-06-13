@@ -32,6 +32,10 @@ _Avoid_: component, part
 Raw netlist text for Xyce features such as `.MODEL`, `.OPTIONS`, and `.SUBCKT` that is carried through without parsing internals.
 _Avoid_: command, config line
 
+**Directive builder**:
+A typed Python object that emits one exact SPICE directive line while leaving directive internals to Xyce when they are expression-shaped.
+_Avoid_: parser, interpreter
+
 **Xyce project**:
 A raw Xyce netlist plus declared output files that can be executed without using `CircuitGraph`.
 _Avoid_: job, raw run

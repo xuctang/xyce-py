@@ -8,7 +8,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 import xyce_py
-from xyce_py import compiler, engine, graph, models, netlists, outputs
+from xyce_py import compiler, directives, engine, graph, models, netlists, outputs
 from xyce_py.compiler import NetlistCompiler
 from xyce_py.graph import CircuitGraph
 from xyce_py.models import SolveResult, Subcircuit, VoltageSource
@@ -29,10 +29,14 @@ def test___all___exports_resolve_to_expected_objects():
         "Diode": models.Diode,
         "Inductor": models.Inductor,
         "MOSFET": models.MOSFET,
+        "MeasureDirective": directives.MeasureDirective,
         "NTerminalDevice": models.NTerminalDevice,
         "NetlistCompiler": compiler.NetlistCompiler,
         "OutputArtifact": outputs.OutputArtifact,
         "OutputSpec": outputs.OutputSpec,
+        "ParameterDirective": directives.ParameterDirective,
+        "PrintDirective": directives.PrintDirective,
+        "RawDirective": directives.RawDirective,
         "Resistor": models.Resistor,
         "SolveResult": models.SolveResult,
         "Subcircuit": models.Subcircuit,

@@ -14,7 +14,7 @@ from ._validation import validate_non_empty_string as _validate_non_empty_string
 OutputKind = Literal["csv", "text"]
 
 
-def _validate_relative_output_path(output_path: object, field_name: str) -> str:
+def validate_relative_output_path(output_path: object, field_name: str) -> str:
     output_path = _validate_non_empty_string(output_path, field_name)
     path = Path(output_path)
     if path.is_absolute():
@@ -45,7 +45,7 @@ class OutputSpec:
 
     def __post_init__(self):
         name = _validate_non_empty_string(self.name, "name")
-        path = _validate_relative_output_path(self.path, "path")
+        path = validate_relative_output_path(self.path, "path")
         if self.kind not in {"csv", "text"}:
             raise ValueError("kind must be exactly 'csv' or 'text'.")
         if not isinstance(self.required, bool):

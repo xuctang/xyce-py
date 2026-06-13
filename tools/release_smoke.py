@@ -9,6 +9,7 @@ EXPECTED_EXPORTS = {
     "CircuitGraph",
     "NetlistCompiler",
     "OutputSpec",
+    "ParameterDirective",
     "Resistor",
     "VoltageSource",
     "XyceProject",
@@ -61,6 +62,10 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     if raw_project.output_specs[0].path != "raw.csv":
         raise AssertionError("Raw-project smoke did not preserve the declared output path.")
 
+    parameter_line = xyce_py.ParameterDirective("RLOAD", "1k").to_spice()
+    if parameter_line != ".PARAM RLOAD=1k":
+        raise AssertionError("ParameterDirective smoke did not emit the expected .PARAM line.")
+
     return {
         "package_name": package_metadata["Name"],
         "package_version": package_version,
@@ -68,6 +73,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "required_python": package_metadata["Requires-Python"],
         "export_count": len(xyce_py.__all__),
         "netlist_line_count": len(netlist.splitlines()),
+        "parameter_directive": parameter_line,
         "raw_project_outputs": len(raw_project.output_specs),
     }
 

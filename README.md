@@ -17,6 +17,8 @@ generation, process execution, result loading, and node-name translation.
   subcircuit instances.
 - A `NetlistCompiler` that converts the graph into a Xyce/SPICE-style netlist.
 - Simulation helpers for operating point, transient, AC, and DC analyses.
+- Typed directive builders for common outer contracts such as `.PARAM`,
+  `.PRINT`, and `.MEASURE`.
 - A raw `XyceProject` interface for exact netlists that use advanced Xyce
   syntax beyond the typed graph helpers.
 - Pandas `DataFrame` output for waveforms, plus helpers to translate generated
@@ -152,6 +154,29 @@ graph.add_subcircuit(".SUBCKT BUF IN OUT\nR1 OUT IN 1k\n.ENDS")
 
 Subcircuit definitions are passed through as opaque SPICE text. Xyce validates
 subcircuit internals and arity during simulation.
+
+## Parameters and Directive Builders
+
+Use `add_parameter()` for `.PARAM` values in `CircuitGraph` netlists:
+
+```python
+graph.add_parameter("RLOAD", "1k")
+graph.add_branch("vout", "gnd", [Resistor("load", "{RLOAD}")])
+```
+
+Directive builders emit exact SPICE directive text while leaving Xyce-specific
+expressions to Xyce:
+
+```python
+from xyce_py import MeasureDirective, PrintDirective
+
+print_line = PrintDirective("TRAN", ["V(out)"], file="tran.csv").to_spice()
+measure_line = MeasureDirective(
+    "TRAN",
+    "rise_time",
+    "TRIG V(out) VAL=0.1 RISE=1 TARG V(out) VAL=0.9 RISE=1",
+).to_spice()
+```
 
 ## Error Handling
 

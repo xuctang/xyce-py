@@ -63,3 +63,16 @@ def test_simulate_op_diode_bias_real_xyce(tmp_path, xyce_path_or_skip):
 
     assert translated.iloc[0]["V(vin)"] == pytest.approx(5.0, abs=1e-4)
     assert 0.0 < diode_node_voltage < 5.0
+
+
+def test_simulate_op_parameterized_resistor_real_xyce(tmp_path, xyce_path_or_skip):
+    circuit = CircuitGraph(xyce_path=xyce_path_or_skip, base_out_dir=str(tmp_path))
+    circuit.add_node("gnd", is_ground=True)
+    circuit.add_parameter("RLOAD", "1000")
+    circuit.add_branch("vin", "gnd", [VoltageSource("src", 10.0)])
+    circuit.add_branch("vin", "vout", [Resistor("r1", "{RLOAD}")])
+    circuit.add_branch("vout", "gnd", [Resistor("r2", "{RLOAD}")])
+
+    translated = circuit.simulate_op().translated_waveforms()
+
+    assert translated.iloc[0]["V(vout)"] == pytest.approx(5.0, abs=1e-2)

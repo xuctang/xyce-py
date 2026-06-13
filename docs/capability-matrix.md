@@ -18,14 +18,15 @@ This matrix tracks the public support surface against the current Xyce documenta
 | Common multi-terminal devices | Supported | `BJT`, `MOSFET`, `Subcircuit` | Exact netlist and arity contract tests |
 | Raw Xyce netlists | Supported | `XyceProject` | Unit tests for exact execution contracts and output parsing |
 | Opaque Xyce directives | Partial | `add_model`, `add_options`, `add_subcircuit`, raw project netlists | Directive contract tests |
+| Typed directive builders | Supported | `ParameterDirective`, `PrintDirective`, `MeasureDirective`, `RawDirective` | Exact-line unit tests and public export tests |
 | Operating point analysis | Supported | `simulate_op`, `simulate(".OP")` | Unit and real-Xyce integration tests |
 | Transient analysis | Supported | `simulate_transient`, `simulate(".TRAN ...")` | Unit and real-Xyce integration tests |
 | AC analysis | Supported | `simulate_ac`, `simulate(".AC ...")` | Unit and real-Xyce integration tests |
 | DC analysis | Supported | `simulate_dc`, `simulate(".DC ...")` | Unit and real-Xyce integration tests |
 | Advanced analyses such as `.NOISE`, `.HB`, `.SENS`, `.FOUR`, `.STEP` | Raw-supported | `XyceProject` with exact netlist text | Raw execution contract tests; typed helpers planned |
 | Explicit output files | Supported | `OutputSpec`, `OutputArtifact`, `XyceProjectResult.outputs` | Unit tests for CSV, text, missing, optional, and malformed outputs |
-| Measurement extraction | Raw-supported | `OutputSpec.text` for Xyce-generated measurement files | Structured measurement parser planned |
-| Parameterization and sweeps | Raw-supported | Exact `.PARAM` and sweep directives inside `XyceProject` netlists | Typed helpers planned |
+| Measurement extraction | Partial | `MeasureDirective`, `OutputSpec.text` for Xyce-generated measurement files | Exact-line unit tests; structured measurement parser planned |
+| Parameterization and sweeps | Partial | `CircuitGraph.add_parameter`, `ParameterDirective`, exact sweep directives inside `XyceProject` netlists | Unit and real-Xyce `.PARAM` tests; sweep helpers planned |
 | Schematic or XDM netlist import | Planned | None | XDM adapter planned |
 | Xyce/ADMS model development workflow | Planned | None | External-tool adapter planned |
 | Command-line interface | Planned | None | CLI contract tests planned |

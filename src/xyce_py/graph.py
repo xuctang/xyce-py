@@ -9,6 +9,7 @@ import networkx as nx
 
 from ._validation import validate_non_empty_string as _validate_non_empty_string
 from .compiler import NetlistCompiler
+from .directives import ParameterDirective, PrintDirective
 from .engine import run_xyce_netlist, find_xyce_executable
 from .models import CircuitElement, NTerminalDevice, SolveResult
 
@@ -106,6 +107,9 @@ class CircuitGraph:
             raise ValueError("options_string must start with '.OPTIONS'.")
         self.spice_directives.append(directive)
 
+    def add_parameter(self, name: str, value: object):
+        self.spice_directives.append(ParameterDirective(name, value).to_spice())
+
     def add_subcircuit(self, subckt_string: str):
         directive = _validate_non_empty_string(subckt_string, "subckt_string").strip()
         if not directive.startswith(".SUBCKT"):
@@ -142,9 +146,7 @@ class CircuitGraph:
         )
         print_analysis_type = "DC" if analysis_type == "OP" else analysis_type
         netlist_lines.append(resolved_analysis_cmd)
-        netlist_lines.append(
-            f".PRINT {print_analysis_type} FORMAT=CSV FILE=output.csv {' '.join(resolved_print_vars)}"
-        )
+        netlist_lines.append(PrintDirective(print_analysis_type, resolved_print_vars).to_spice())
         netlist_lines.append(".END")
         final_netlist = "\n".join(netlist_lines) + "\n"
 
