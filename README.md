@@ -236,6 +236,23 @@ monte_carlo = XyceMonteCarloSweep(
 )
 ```
 
+## Run XDM Translation
+
+Use `XdmTranslator` to invoke an installed XDM translator with explicit XDM
+arguments and validate the translated artifact:
+
+```python
+from xyce_py import XdmTranslator
+
+translation = XdmTranslator(xdm_path="xdm").run(
+    ["source.sp", "translated.cir"],
+    working_dir=".",
+    expected_output="translated.cir",
+)
+
+print(translation.translated_netlist_text())
+```
+
 ## Models, Options, and Subcircuits
 
 Raw Xyce directives can be attached to the graph when needed:

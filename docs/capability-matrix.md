@@ -28,7 +28,7 @@ This matrix tracks the public support surface against the current Xyce documenta
 | Explicit output files | Supported | `OutputSpec`, `OutputArtifact`, `XyceProjectResult.outputs`, `SolveResult.outputs`, graph `output_specs` | Unit tests for CSV, text, missing, optional, graph collection, and malformed outputs |
 | Measurement extraction | Supported | `MeasureDirective`, `CircuitGraph.add_measurement`, `XyceProjectResult.measurements`, `SolveResult.measurements`, `parse_measurements`, `read_measurements` | Parser unit tests and real-Xyce `.mt0` integration tests |
 | Parameterization, sweeps, and Monte Carlo | Supported | `CircuitGraph.add_parameter`, `ParameterDirective`, `SweepParameter`, `XyceParameterSweep`, `MonteCarloParameter`, `UniformDistribution`, `NormalDistribution`, `XyceMonteCarloSweep`, exact native sweep directives inside `XyceProject` netlists | Unit and real-Xyce `.PARAM`, Python-side sweep, and deterministic Monte Carlo tests |
-| Schematic or XDM netlist import | Planned | None | XDM adapter planned |
+| Schematic or XDM netlist import | Partial | `XdmTranslator`, `XdmTranslationResult`, `XdmTranslationError` | Unit tests with fake external XDM executable for success, failure, and missing outputs |
 | Xyce/ADMS model development workflow | Planned | None | External-tool adapter planned |
 | Command-line interface | Supported | `xyce-py run`, `python -m xyce_py run` | Unit tests for output declarations, JSON summary, and Xyce error propagation; package entry-point checks |
 

@@ -68,6 +68,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
         Path("src/xyce_py/netlists.py"),
         Path("src/xyce_py/outputs.py"),
         Path("src/xyce_py/sweeps.py"),
+        Path("src/xyce_py/xdm.py"),
     ]
     latest_source_mtime = max(path.stat().st_mtime for path in required_package_sources)
     if min(wheel_path.stat().st_mtime, sdist_path.stat().st_mtime) < latest_source_mtime:
@@ -96,6 +97,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     assert "xyce_py/netlists.py" in wheel_names
     assert "xyce_py/outputs.py" in wheel_names
     assert "xyce_py/sweeps.py" in wheel_names
+    assert "xyce_py/xdm.py" in wheel_names
     assert "[console_scripts]" in entry_points_text
     assert "xyce-py = xyce_py.cli:main" in entry_points_text
 
@@ -114,6 +116,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     assert f"{sdist_root}/src/xyce_py/netlists.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/outputs.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/sweeps.py" in sdist_names
+    assert f"{sdist_root}/src/xyce_py/xdm.py" in sdist_names
 
 
 def test_installed_wheel_executes_compile_only_quick_start_snippet():

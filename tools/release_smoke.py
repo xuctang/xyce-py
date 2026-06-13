@@ -17,6 +17,7 @@ EXPECTED_EXPORTS = {
     "Resistor",
     "SweepParameter",
     "UniformDistribution",
+    "XdmTranslator",
     "XyceMonteCarloSweep",
     "VoltageSource",
     "XyceParameterSweep",
@@ -73,6 +74,10 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     if raw_project.output_specs[0].path != "raw.csv":
         raise AssertionError("Raw-project smoke did not preserve the declared output path.")
 
+    xdm_translator = xyce_py.XdmTranslator("xdm")
+    if xdm_translator.xdm_path != "xdm":
+        raise AssertionError("XdmTranslator smoke did not preserve the declared executable path.")
+
     sweep = xyce_py.XyceParameterSweep(
         "smoke-sweep",
         "* smoke sweep\nR1 1 0 {RLOAD}\n.OP\n.PRINT DC FORMAT=CSV FILE=raw.csv V(1)\n.END\n",
@@ -119,6 +124,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "raw_project_outputs": len(raw_project.output_specs),
         "monte_carlo_points": len(monte_carlo.points()),
         "sweep_points": len(sweep.points()),
+        "xdm_path": xdm_translator.xdm_path,
     }
 
 

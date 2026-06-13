@@ -56,6 +56,10 @@ _Avoid_: job, raw run
 A terminal invocation that executes an exact Xyce project and reports declared output artifacts without changing the netlist.
 _Avoid_: shell wrapper, command wrapper
 
+**XDM translation**:
+An external XDM command invocation that translates third-party netlist syntax into a Xyce-targeted artifact.
+_Avoid_: schematic import magic, netlist parser
+
 **Output spec**:
 An explicit declaration of a relative output file path and parser kind expected from a Xyce execution.
 _Avoid_: output guess, file hint

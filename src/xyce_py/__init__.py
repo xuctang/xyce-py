@@ -16,6 +16,7 @@ from .sweeps import (
     XyceParameterSweep,
     XyceParameterSweepResult,
 )
+from .xdm import XdmTranslationError, XdmTranslationResult, XdmTranslator
 from .models import (
     BJT,
     MOSFET,
@@ -63,6 +64,9 @@ __all__ = [
     "SweepRunResult",
     "UniformDistribution",
     "VoltageSource",
+    "XdmTranslationError",
+    "XdmTranslationResult",
+    "XdmTranslator",
     "XyceExecutionResult",
     "XyceMonteCarloSweep",
     "XyceParameterSweep",

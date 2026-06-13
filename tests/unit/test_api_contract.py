@@ -8,7 +8,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 import xyce_py
-from xyce_py import compiler, directives, engine, graph, measurements, models, netlists, outputs, sweeps
+from xyce_py import compiler, directives, engine, graph, measurements, models, netlists, outputs, sweeps, xdm
 from xyce_py.compiler import NetlistCompiler
 from xyce_py.graph import CircuitGraph
 from xyce_py.models import SolveResult, Subcircuit, VoltageSource
@@ -49,6 +49,9 @@ def test___all___exports_resolve_to_expected_objects():
         "SweepRunResult": sweeps.SweepRunResult,
         "UniformDistribution": sweeps.UniformDistribution,
         "VoltageSource": models.VoltageSource,
+        "XdmTranslationError": xdm.XdmTranslationError,
+        "XdmTranslationResult": xdm.XdmTranslationResult,
+        "XdmTranslator": xdm.XdmTranslator,
         "XyceExecutionResult": engine.XyceExecutionResult,
         "XyceMonteCarloSweep": sweeps.XyceMonteCarloSweep,
         "XyceParameterSweep": sweeps.XyceParameterSweep,
