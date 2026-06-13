@@ -16,6 +16,17 @@ from tests.readme_helpers import extract_python_snippet
 pytestmark = pytest.mark.packaging
 
 
+def _built_artifact_paths() -> tuple[Path, Path]:
+    dist_dir = Path("dist")
+    wheel_paths = sorted(dist_dir.glob("xyce_py-*.whl"))
+    sdist_paths = sorted(dist_dir.glob("xyce_py-*.tar.gz"))
+    if not wheel_paths or not sdist_paths:
+        pytest.skip("Built artifacts are not present; run `python -m build` first.")
+    assert len(wheel_paths) == 1
+    assert len(sdist_paths) == 1
+    return wheel_paths[0], sdist_paths[0]
+
+
 def test_installed_wheel_imports_xyce_py_and_top_level_exports():
     assert xyce_py.CircuitGraph is not None
     assert xyce_py.Resistor is not None
@@ -50,11 +61,7 @@ def test_pyproject_declares_console_script_entry_point():
 
 
 def test_built_sdist_and_wheel_contain_required_package_files():
-    dist_dir = Path("dist")
-    if not any(dist_dir.glob("*.whl")) or not any(dist_dir.glob("*.tar.gz")):
-        pytest.skip("Built artifacts are not present; run `python -m build` first.")
-    wheel_path = next(dist_dir.glob("*.whl"))
-    sdist_path = next(dist_dir.glob("*.tar.gz"))
+    wheel_path, sdist_path = _built_artifact_paths()
     required_package_sources = [
         Path("src/xyce_py/__init__.py"),
         Path("src/xyce_py/__main__.py"),
@@ -126,6 +133,72 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     assert f"{sdist_root}/src/xyce_py/py.typed" in sdist_names
     assert f"{sdist_root}/src/xyce_py/sweeps.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/xdm.py" in sdist_names
+
+
+def test_built_sdist_includes_public_source_material_without_bloating_wheel():
+    wheel_path, sdist_path = _built_artifact_paths()
+    manifest_path = Path("MANIFEST.in")
+    if min(wheel_path.stat().st_mtime, sdist_path.stat().st_mtime) < manifest_path.stat().st_mtime:
+        pytest.skip("Built artifacts are stale; run `python -m build` first.")
+
+    with zipfile.ZipFile(wheel_path) as wheel_archive:
+        wheel_names = set(wheel_archive.namelist())
+
+    with tarfile.open(sdist_path, "r:gz") as sdist_archive:
+        sdist_names = set(sdist_archive.getnames())
+
+    sdist_root = next(name for name in sdist_names if name.endswith("/pyproject.toml")).rsplit("/", 1)[0]
+    required_sdist_files = {
+        "CONTEXT.md",
+        "MANIFEST.in",
+        "pytest.ini",
+        "requirements.txt",
+        "constraints/runtime-min.txt",
+        "docs/api-reference.md",
+        "docs/capability-matrix.md",
+        "docs/adr/0016-graph-input-and-result-projection.md",
+        "examples/README.md",
+        "examples/01_circuitgraph_quickstart.ipynb",
+        "security/pip_audit_allowlist.json",
+        "tests/conftest.py",
+        "tests/readme_helpers.py",
+        "tests/unit/test_examples.py",
+        "tests/packaging/test_installed_package.py",
+        "tools/release_smoke.py",
+        "tools/pip_audit_policy.py",
+        "tools/cleanroom/Dockerfile",
+        "tools/cleanroom/run_registry_smoke.sh",
+    }
+
+    for relative_path in required_sdist_files:
+        assert f"{sdist_root}/{relative_path}" in sdist_names
+
+    wheel_prefixes_to_keep_out = (
+        "constraints/",
+        "docs/",
+        "examples/",
+        "security/",
+        "tests/",
+        "tools/",
+    )
+    assert not any(name.startswith(wheel_prefixes_to_keep_out) for name in wheel_names)
+    assert "CONTEXT.md" not in wheel_names
+    assert "pytest.ini" not in wheel_names
+    assert "requirements.txt" not in wheel_names
+
+    generated_path_markers = (
+        "/.github/",
+        "/.hypothesis/",
+        "/.pkg-venv/",
+        "/.pytest_cache/",
+        "/.venv/",
+        "/_xyce_runs/",
+        "/build/",
+        "/dist/",
+        "/__pycache__/",
+    )
+    assert not any(any(marker in name for marker in generated_path_markers) for name in sdist_names)
+    assert not any(name.endswith((".coverage", ".pyc", ".pyo", ".DS_Store")) for name in sdist_names)
 
 
 def test_installed_wheel_executes_compile_only_quick_start_snippet():
