@@ -8,8 +8,10 @@ import sys
 EXPECTED_EXPORTS = {
     "CircuitGraph",
     "NetlistCompiler",
+    "OutputSpec",
     "Resistor",
     "VoltageSource",
+    "XyceProject",
     "find_xyce_executable",
 }
 
@@ -21,6 +23,14 @@ def build_compile_only_netlist(package_module) -> str:
     circuit.add_branch("vin", "vout", [package_module.Resistor("r1", 1000)])
     circuit.add_branch("vout", "gnd", [package_module.Resistor("r2", 1000)])
     return package_module.NetlistCompiler(circuit.G, circuit.spice_directives).compile()
+
+
+def build_raw_netlist_project(package_module):
+    return package_module.XyceProject(
+        "raw-smoke",
+        "* raw smoke\nR1 1 0 1k\n.OP\n.PRINT DC FORMAT=CSV FILE=raw.csv V(1)\n.END\n",
+        output_specs=(package_module.OutputSpec.csv("waveforms", "raw.csv"),),
+    )
 
 
 def run_smoke(expect_version: str | None = None) -> dict[str, object]:
@@ -47,6 +57,10 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     if not netlist.endswith(".END\n"):
         raise AssertionError("Compile-only smoke netlist did not end with a single trailing .END line.")
 
+    raw_project = build_raw_netlist_project(xyce_py)
+    if raw_project.output_specs[0].path != "raw.csv":
+        raise AssertionError("Raw-project smoke did not preserve the declared output path.")
+
     return {
         "package_name": package_metadata["Name"],
         "package_version": package_version,
@@ -54,6 +68,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "required_python": package_metadata["Requires-Python"],
         "export_count": len(xyce_py.__all__),
         "netlist_line_count": len(netlist.splitlines()),
+        "raw_project_outputs": len(raw_project.output_specs),
     }
 
 

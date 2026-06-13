@@ -1,6 +1,8 @@
 from .compiler import NetlistCompiler
 from .engine import XyceExecutionResult, XyceRunError, run_xyce_netlist, find_xyce_executable
 from .graph import CircuitGraph, CircuitTopologyError
+from .netlists import XyceProject, XyceProjectResult
+from .outputs import OutputArtifact, OutputSpec
 from .models import (
     BJT,
     MOSFET,
@@ -30,11 +32,15 @@ __all__ = [
     "MOSFET",
     "NTerminalDevice",
     "NetlistCompiler",
+    "OutputArtifact",
+    "OutputSpec",
     "Resistor",
     "SolveResult",
     "Subcircuit",
     "VoltageSource",
     "XyceExecutionResult",
+    "XyceProject",
+    "XyceProjectResult",
     "XyceRunError",
     "run_xyce_netlist",
     "find_xyce_executable",

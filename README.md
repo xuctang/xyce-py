@@ -17,6 +17,8 @@ generation, process execution, result loading, and node-name translation.
   subcircuit instances.
 - A `NetlistCompiler` that converts the graph into a Xyce/SPICE-style netlist.
 - Simulation helpers for operating point, transient, AC, and DC analyses.
+- A raw `XyceProject` interface for exact netlists that use advanced Xyce
+  syntax beyond the typed graph helpers.
 - Pandas `DataFrame` output for waveforms, plus helpers to translate generated
   SPICE node names back to user node names.
 - Fail-fast validation for invalid Python-side inputs and disconnected topologies
@@ -113,6 +115,31 @@ result = graph.simulate_dc("V_supply", "0", "5", "0.5")
 You can also call `graph.simulate(".OP")`, `graph.simulate(".TRAN ...")`,
 `graph.simulate(".AC ...")`, or `graph.simulate(".DC ...")` directly.
 
+## Run Raw Xyce Netlists
+
+Use `XyceProject` when you already have an exact Xyce netlist, need an advanced
+analysis directive, or want Xyce to remain the only parser for a feature.
+
+```python
+from xyce_py import OutputSpec, XyceProject
+
+project = XyceProject(
+    "raw-divider",
+    """* raw voltage divider
+V1 1 0 DC 10
+R1 1 2 1000
+R2 2 0 1000
+.OP
+.PRINT DC FORMAT=CSV FILE=raw.csv V(1) V(2)
+.END
+""",
+    output_specs=(OutputSpec.csv("waveforms", "raw.csv"),),
+)
+
+result = project.run(xyce_path="Xyce")
+print(result.outputs["waveforms"].frame)
+```
+
 ## Models, Options, and Subcircuits
 
 Raw Xyce directives can be attached to the graph when needed:
@@ -172,3 +199,5 @@ python -m twine check dist/*
 ```
 
 See `docs/release.md` for the release checklist used before publishing.
+See `docs/capability-matrix.md` for the supported and planned Xyce capability
+surface.

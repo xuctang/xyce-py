@@ -32,6 +32,18 @@ _Avoid_: component, part
 Raw netlist text for Xyce features such as `.MODEL`, `.OPTIONS`, and `.SUBCKT` that is carried through without parsing internals.
 _Avoid_: command, config line
 
+**Xyce project**:
+A raw Xyce netlist plus declared output files that can be executed without using `CircuitGraph`.
+_Avoid_: job, raw run
+
+**Output spec**:
+An explicit declaration of a relative output file path and parser kind expected from a Xyce execution.
+_Avoid_: output guess, file hint
+
+**Output artifact**:
+The parsed or located file produced by Xyce for an output spec after execution.
+_Avoid_: output blob, loose file
+
 **Netlist body**:
 The compiled netlist lines before simulation analysis directives, `.PRINT`, and `.END` are appended.
 _Avoid_: partial netlist, template

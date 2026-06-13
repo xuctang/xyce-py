@@ -1,0 +1,30 @@
+from __future__ import annotations
+
+import pytest
+
+from xyce_py import OutputSpec, XyceProject
+
+
+pytestmark = pytest.mark.xyce
+
+
+def test_raw_netlist_project_runs_exact_netlist_with_real_xyce(tmp_path, xyce_path_or_skip):
+    project = XyceProject(
+        "raw-voltage-divider",
+        """* raw voltage divider
+V1 1 0 DC 10
+R1 1 2 1000
+R2 2 0 1000
+.OP
+.PRINT DC FORMAT=CSV FILE=raw.csv V(1) V(2)
+.END
+""",
+        output_specs=(OutputSpec.csv("waveforms", "raw.csv"),),
+    )
+
+    result = project.run(xyce_path=xyce_path_or_skip, base_out_dir=tmp_path)
+
+    frame = result.outputs["waveforms"].frame
+    assert len(frame) == 1
+    assert frame.iloc[0]["V(1)"] == pytest.approx(10.0, abs=1e-4)
+    assert frame.iloc[0]["V(2)"] == pytest.approx(5.0, abs=1e-2)

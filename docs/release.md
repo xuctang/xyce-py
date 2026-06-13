@@ -16,12 +16,13 @@ clean-room post-publish smoke pass.
 
 1. Run `.github/workflows/xyce-runner-smoke.yml` with `workflow_dispatch`.
 2. Confirm both Linux and macOS runner jobs pass and record their `Xyce -v` output.
-3. Bump `pyproject.toml` to a prerelease version such as `1.0.1rc1`.
-4. Run `.github/workflows/release-candidate.yml` with `workflow_dispatch`.
-5. If the workflow fails, fix the issue, bump to the next prerelease such as `1.0.1rc2`, and rerun the rehearsal.
-6. After a green rehearsal for the same release line, bump `pyproject.toml` to the final version such as `1.0.1`.
-7. Run `.github/workflows/publish.yml` with `workflow_dispatch`.
-8. Wait for `.github/workflows/post-publish-smoke.yml` to complete successfully against PyPI.
+3. Confirm `docs/capability-matrix.md` matches the public support surface.
+4. Bump `pyproject.toml` to a prerelease version such as `1.0.1rc1`.
+5. Run `.github/workflows/release-candidate.yml` with `workflow_dispatch`.
+6. If the workflow fails, fix the issue, bump to the next prerelease such as `1.0.1rc2`, and rerun the rehearsal.
+7. After a green rehearsal for the same release line, bump `pyproject.toml` to the final version such as `1.0.1`.
+8. Run `.github/workflows/publish.yml` with `workflow_dispatch`.
+9. Wait for `.github/workflows/post-publish-smoke.yml` to complete successfully against PyPI.
 
 ## Release Candidate Flow
 

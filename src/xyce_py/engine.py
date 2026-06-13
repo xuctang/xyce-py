@@ -9,6 +9,8 @@ import time
 
 import pandas as pd
 
+from .outputs import read_csv_output
+
 
 def find_xyce_executable() -> str:
     default_xyce_path = "/usr/local/XyceNF_7.10/bin/Xyce"
@@ -18,13 +20,7 @@ def find_xyce_executable() -> str:
 
 
 def _read_waveforms(csv_path: Path) -> pd.DataFrame:
-    if not csv_path.exists() or csv_path.stat().st_size == 0:
-        return pd.DataFrame()
-
-    try:
-        return pd.read_csv(csv_path)
-    except pd.errors.EmptyDataError:
-        return pd.DataFrame()
+    return read_csv_output(csv_path)
 
 
 @dataclass(frozen=True)
