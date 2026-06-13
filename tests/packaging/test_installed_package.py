@@ -149,10 +149,12 @@ def test_built_sdist_includes_public_source_material_without_bloating_wheel():
 
     sdist_root = next(name for name in sdist_names if name.endswith("/pyproject.toml")).rsplit("/", 1)[0]
     required_sdist_files = {
+        "CHANGELOG.md",
         "CONTEXT.md",
         "MANIFEST.in",
         "pytest.ini",
         "requirements.txt",
+        "SECURITY.md",
         "constraints/runtime-min.txt",
         "docs/api-reference.md",
         "docs/capability-matrix.md",
