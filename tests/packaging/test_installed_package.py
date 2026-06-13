@@ -67,6 +67,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
         Path("src/xyce_py/models.py"),
         Path("src/xyce_py/netlists.py"),
         Path("src/xyce_py/outputs.py"),
+        Path("src/xyce_py/py.typed"),
         Path("src/xyce_py/sweeps.py"),
         Path("src/xyce_py/xdm.py"),
     ]
@@ -96,6 +97,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     assert "xyce_py/models.py" in wheel_names
     assert "xyce_py/netlists.py" in wheel_names
     assert "xyce_py/outputs.py" in wheel_names
+    assert "xyce_py/py.typed" in wheel_names
     assert "xyce_py/sweeps.py" in wheel_names
     assert "xyce_py/xdm.py" in wheel_names
     assert "[console_scripts]" in entry_points_text
@@ -115,6 +117,7 @@ def test_built_sdist_and_wheel_contain_required_package_files():
     assert f"{sdist_root}/src/xyce_py/models.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/netlists.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/outputs.py" in sdist_names
+    assert f"{sdist_root}/src/xyce_py/py.typed" in sdist_names
     assert f"{sdist_root}/src/xyce_py/sweeps.py" in sdist_names
     assert f"{sdist_root}/src/xyce_py/xdm.py" in sdist_names
 

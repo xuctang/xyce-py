@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata as metadata
+import importlib.resources as resources
 import json
 import sys
 
@@ -81,6 +82,8 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
             raise AssertionError(f"xyce_py.{name} did not resolve to an object.")
     if xyce_py.cli.main is None:
         raise AssertionError("xyce_py.cli.main did not resolve to an object.")
+    if not resources.files("xyce_py").joinpath("py.typed").is_file():
+        raise AssertionError("xyce_py package does not expose its py.typed marker.")
 
     package_metadata = metadata.metadata("xyce-py")
     netlist = build_compile_only_netlist(xyce_py)
@@ -156,6 +159,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "required_python": package_metadata["Requires-Python"],
         "export_count": len(xyce_py.__all__),
         "has_cli": True,
+        "has_py_typed": True,
         "netlist_line_count": len(netlist.splitlines()),
         "options_directive": options_line,
         "parameter_directive": parameter_line,
