@@ -37,6 +37,7 @@ def build_raw_netlist_project(package_module):
 
 def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     import xyce_py
+    import xyce_py.cli
 
     package_version = metadata.version("xyce-py")
     if expect_version is not None and package_version != expect_version:
@@ -51,6 +52,8 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
     for name in EXPECTED_EXPORTS:
         if getattr(xyce_py, name, None) is None:
             raise AssertionError(f"xyce_py.{name} did not resolve to an object.")
+    if xyce_py.cli.main is None:
+        raise AssertionError("xyce_py.cli.main did not resolve to an object.")
 
     package_metadata = metadata.metadata("xyce-py")
     netlist = build_compile_only_netlist(xyce_py)
@@ -77,6 +80,7 @@ def run_smoke(expect_version: str | None = None) -> dict[str, object]:
         "summary": package_metadata["Summary"],
         "required_python": package_metadata["Requires-Python"],
         "export_count": len(xyce_py.__all__),
+        "has_cli": True,
         "netlist_line_count": len(netlist.splitlines()),
         "options_directive": options_line,
         "parameter_directive": parameter_line,

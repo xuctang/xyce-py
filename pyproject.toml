@@ -28,6 +28,9 @@ Repository = "https://github.com/xuctang/xyce-py"
 Issues = "https://github.com/xuctang/xyce-py/issues"
 Documentation = "https://github.com/xuctang/xyce-py#readme"
 
+[project.scripts]
+xyce-py = "xyce_py.cli:main"
+
 [project.optional-dependencies]
 test = [
   "build>=1.0",

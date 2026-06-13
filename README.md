@@ -142,6 +142,15 @@ result = project.run(xyce_path="Xyce")
 print(result.outputs["waveforms"].frame)
 ```
 
+The same raw-netlist path is available from the command line:
+
+```bash
+xyce-py run raw-divider.cir --csv-output waveforms raw.csv
+```
+
+The command prints a JSON summary containing the run directory, solve time, Xyce
+stdout/stderr, and declared output metadata.
+
 ## Models, Options, and Subcircuits
 
 Raw Xyce directives can be attached to the graph when needed:

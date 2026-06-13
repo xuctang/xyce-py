@@ -30,7 +30,7 @@ This matrix tracks the public support surface against the current Xyce documenta
 | Parameterization and sweeps | Partial | `CircuitGraph.add_parameter`, `ParameterDirective`, exact sweep directives inside `XyceProject` netlists | Unit and real-Xyce `.PARAM` tests; sweep helpers planned |
 | Schematic or XDM netlist import | Planned | None | XDM adapter planned |
 | Xyce/ADMS model development workflow | Planned | None | External-tool adapter planned |
-| Command-line interface | Planned | None | CLI contract tests planned |
+| Command-line interface | Supported | `xyce-py run`, `python -m xyce_py run` | Unit tests for output declarations, JSON summary, and Xyce error propagation; package entry-point checks |
 
 ## Release Gate
 

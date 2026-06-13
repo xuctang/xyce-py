@@ -44,6 +44,10 @@ _Avoid_: solver config, runtime knobs
 A raw Xyce netlist plus declared output files that can be executed without using `CircuitGraph`.
 _Avoid_: job, raw run
 
+**Command-line run**:
+A terminal invocation that executes an exact Xyce project and reports declared output artifacts without changing the netlist.
+_Avoid_: shell wrapper, command wrapper
+
 **Output spec**:
 An explicit declaration of a relative output file path and parser kind expected from a Xyce execution.
 _Avoid_: output guess, file hint
