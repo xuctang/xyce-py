@@ -1,0 +1,49 @@
+name: Mutation Testing
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  mutmut:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install mutation tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[test]' mutmut
+
+      - name: Run mutmut
+        continue-on-error: true
+        run: mutmut run
+
+      - name: Capture mutation results
+        if: always()
+        run: |
+          mutmut results > mutmut-results.txt || true
+          {
+            echo "## Mutation Testing"
+            echo ""
+            echo '```text'
+            cat mutmut-results.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload mutation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results
+          path: |
+            mutmut-results.txt
+            .mutmut-cache
+            mutants

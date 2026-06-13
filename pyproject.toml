@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,10 +11,10 @@ authors = [
 description = "A generic, NetworkX-driven Python wrapper for the Sandia Xyce circuit simulation engine."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
   "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
 ]
@@ -23,8 +23,28 @@ dependencies = [
   "pandas>=2.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/xuctang/xyce-py"
+Issues = "https://github.com/xuctang/xyce-py/issues"
+Documentation = "https://github.com/xuctang/xyce-py#readme"
+
+[project.scripts]
+xyce-py = "xyce_py.cli:main"
+
+[project.optional-dependencies]
+test = [
+  "build>=1.0",
+  "hypothesis>=6.0",
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "twine>=6.0",
+]
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+xyce_py = ["py.typed"]

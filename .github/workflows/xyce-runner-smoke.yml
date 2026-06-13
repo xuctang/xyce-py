@@ -1,0 +1,71 @@
+name: Xyce Runner Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  xyce-runner-smoke-linux:
+    runs-on: [self-hosted, linux, xyce]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[test]'
+
+      - name: Run Xyce smoke test
+        run: pytest tests/integration/test_xyce_runner_smoke.py -m xyce -q
+
+      - name: Write Linux runner summary
+        if: always()
+        run: |
+          {
+            echo "## Linux Runner Smoke"
+            echo ""
+            echo "- Runner OS: $RUNNER_OS"
+            echo "- Runner Architecture: $RUNNER_ARCH"
+            echo "- Python: $(python --version 2>&1)"
+            echo "- Xyce path: $(command -v Xyce || echo 'not found')"
+            echo "- Xyce version:"
+            echo '```text'
+            Xyce -v 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  xyce-runner-smoke-macos:
+    runs-on: [self-hosted, macos, xyce]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[test]'
+
+      - name: Run Xyce smoke test
+        run: pytest tests/integration/test_xyce_runner_smoke.py -m xyce -q
+
+      - name: Write macOS runner summary
+        if: always()
+        run: |
+          {
+            echo "## macOS Runner Smoke"
+            echo ""
+            echo "- Runner OS: $RUNNER_OS"
+            echo "- Runner Architecture: $RUNNER_ARCH"
+            echo "- Python: $(python --version 2>&1)"
+            echo "- Xyce path: $(command -v Xyce || echo 'not found')"
+            echo "- Xyce version:"
+            echo '```text'
+            Xyce -v 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

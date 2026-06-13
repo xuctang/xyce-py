@@ -1,23 +1,22 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from collections.abc import Hashable
+from collections.abc import Hashable, Mapping
+from dataclasses import dataclass, field
+import string
+from types import MappingProxyType
 from typing import Optional, Union
 
 import networkx as nx
 import pandas as pd
 
+from ._validation import validate_non_empty_string as _validate_non_empty_string
+from .measurements import MeasurementResult, parse_measurements
+from .outputs import OutputArtifact
+from ._solutions import node_voltage_updates_from_waveforms
+
 
 ValueLike = Union[str, float]
-
-
-def _validate_non_empty_string(value: object, field_name: str) -> str:
-    if not isinstance(value, str):
-        raise TypeError(f"{field_name} must be a string.")
-    if not value.strip():
-        raise ValueError(f"{field_name} must be a non-empty string.")
-    return value
 
 
 def _validate_numeric(value: object, field_name: str) -> float:
@@ -45,6 +44,33 @@ def _validate_spice_nodes(node_pos: object, node_neg: object) -> tuple[str, str]
         _validate_non_empty_string(node_pos, "node_pos"),
         _validate_non_empty_string(node_neg, "node_neg"),
     )
+
+
+def _template_has_placeholder(template: str, placeholder: str) -> bool:
+    return f"${placeholder}" in template or f"${{{placeholder}}}" in template
+
+
+def _validate_raw_template(
+    template: object,
+    required_placeholders: list[str],
+    substitutions: Mapping[str, str],
+) -> str:
+    template = _validate_non_empty_string(template, "template")
+    missing_placeholders = [
+        placeholder
+        for placeholder in required_placeholders
+        if not _template_has_placeholder(template, placeholder)
+    ]
+    if missing_placeholders:
+        raise ValueError(
+            "template must contain placeholders: "
+            + ", ".join(f"${placeholder}" for placeholder in missing_placeholders)
+        )
+    try:
+        string.Template(template).substitute(substitutions)
+    except (KeyError, ValueError) as exc:
+        raise ValueError(f"template contains an invalid or unknown placeholder: {exc}") from exc
+    return template
 
 
 def _validate_mapped_nodes(mapped_nodes: object, expected_terminals: int) -> list[str]:
@@ -244,6 +270,67 @@ class BehavioralSource(CircuitElement):
 
 
 @dataclass
+class RawTwoTerminalElement(CircuitElement):
+    template: str
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.template = _validate_raw_template(
+            self.template,
+            ["node_pos", "node_neg"],
+            {
+                "name": self.name,
+                "node_pos": "N_POS",
+                "node_neg": "N_NEG",
+            },
+        )
+
+    def to_spice(self, node_pos: str, node_neg: str) -> str:
+        node_pos, node_neg = _validate_spice_nodes(node_pos, node_neg)
+        return string.Template(self.template).substitute(
+            name=self.name,
+            node_pos=node_pos,
+            node_neg=node_neg,
+        )
+
+
+@dataclass
+class RawNTerminalDevice(NTerminalDevice):
+    terminals: int
+    template: str
+
+    def __post_init__(self):
+        super().__post_init__()
+        if isinstance(self.terminals, bool) or not isinstance(self.terminals, int):
+            raise TypeError("terminals must be an integer.")
+        if self.terminals <= 0:
+            raise ValueError("terminals must be a positive integer.")
+        substitutions = {
+            "name": self.name,
+            "model_name": self.model_name,
+            **{f"n{index}": f"N_{index}" for index in range(self.terminals)},
+        }
+        self.template = _validate_raw_template(
+            self.template,
+            [f"n{index}" for index in range(self.terminals)],
+            substitutions,
+        )
+
+    @property
+    def expected_terminals(self) -> int:
+        return self.terminals
+
+    def to_spice(self, mapped_nodes: list[str]) -> str:
+        mapped_nodes = self._validated_mapped_nodes(mapped_nodes)
+        substitutions = {
+            "name": self.name,
+            "model_name": self.model_name,
+            **{f"n{index}": node for index, node in enumerate(mapped_nodes)},
+        }
+        return string.Template(self.template).substitute(substitutions)
+
+
+@dataclass
 class SolveResult:
     original_graph: nx.MultiDiGraph
     expanded_graph: nx.MultiDiGraph
@@ -251,18 +338,50 @@ class SolveResult:
     waveforms: pd.DataFrame
     solve_time_sec: float
     stdout: str
-    node_map_inverse: dict[str, Hashable]
+    spice_to_user_node: dict[str, Hashable]
+    outputs: Mapping[str, OutputArtifact] = field(default_factory=dict)
+
+    def __post_init__(self):
+        object.__setattr__(self, "outputs", MappingProxyType(dict(self.outputs)))
 
     def translated_waveforms(self) -> pd.DataFrame:
-        translated = self.waveforms.copy()
-        renamed_columns: dict[str, str] = {}
+        translated_waveforms = self.waveforms.copy()
+        translated_waveforms.columns = [
+            self._translated_column_name(column) for column in translated_waveforms.columns
+        ]
+        return translated_waveforms
 
-        for column in translated.columns:
-            if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
-                continue
-            spice_id = column[2:-1]
-            if spice_id not in self.node_map_inverse:
-                continue
-            renamed_columns[column] = f"V({self.node_map_inverse[spice_id]})"
+    def solved_graph(self, row: int = 0) -> nx.MultiDiGraph:
+        solved_graph = self.original_graph.copy()
+        node_voltage_updates = node_voltage_updates_from_waveforms(
+            self.waveforms,
+            self.spice_to_user_node,
+            row,
+        )
+        for user_node_id in node_voltage_updates:
+            if "solved_voltage" in solved_graph.nodes[user_node_id]:
+                raise RuntimeError(
+                    "Attribute 'solved_voltage' already exists on node."
+                )
 
-        return translated.rename(columns=renamed_columns)
+        for user_node_id, value in node_voltage_updates.items():
+            solved_graph.nodes[user_node_id]["solved_voltage"] = value
+        return solved_graph
+
+    def _translated_column_name(self, column: object) -> object:
+        if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
+            return column
+        spice_node = column[2:-1]
+        if spice_node not in self.spice_to_user_node:
+            return column
+        return f"V({self.spice_to_user_node[spice_node]})"
+
+    def output(self, name: str) -> OutputArtifact:
+        name = _validate_non_empty_string(name, "name")
+        return self.outputs[name]
+
+    def measurements(self, output_name: str = "measurements") -> Mapping[str, MeasurementResult]:
+        artifact = self.output(output_name)
+        if artifact.text is None:
+            raise TypeError(f"Output {output_name!r} is not a text output artifact.")
+        return parse_measurements(artifact.text)

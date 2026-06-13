@@ -1,33 +1,43 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 import shutil
 from pathlib import Path
 from typing import Optional
 import subprocess
+import sys
 import time
 
 import pandas as pd
 
+from .outputs import read_csv_output
+
+
+def _candidate_xyce_paths() -> tuple[Path, ...]:
+    candidates = [
+        Path("/usr/local/XyceNF_7.10/bin/Xyce"),
+        *sorted(Path("/usr/local").glob("Xyce-Release-*/bin/Xyce")),
+        *sorted(Path("/usr/local").glob("XyceNF_*/bin/Xyce")),
+    ]
+    windows_program_files = Path("C:/Program Files")
+    if sys.platform == "win32" and windows_program_files.exists():
+        candidates.extend(sorted(windows_program_files.glob("Xyce*/bin/Xyce.exe")))
+    return tuple(candidates)
+
 
 def find_xyce_executable() -> str:
-    known_path = "/usr/local/XyceNF_7.10/bin/Xyce"
-    if Path(known_path).exists():
-        return known_path
+    for candidate_path in _candidate_xyce_paths():
+        if candidate_path.exists():
+            return str(candidate_path)
     return shutil.which("Xyce") or "Xyce"
 
 
 def _read_waveforms(csv_path: Path) -> pd.DataFrame:
-    if not csv_path.exists() or csv_path.stat().st_size == 0:
-        return pd.DataFrame()
-
-    try:
-        return pd.read_csv(csv_path)
-    except pd.errors.EmptyDataError:
-        return pd.DataFrame()
+    return read_csv_output(csv_path)
 
 
-@dataclass
-class _XyceExecutionResult:
+@dataclass(frozen=True)
+class XyceExecutionResult:
     run_dir: Path
     netlist_path: Path
     stdout: str
@@ -36,7 +46,7 @@ class _XyceExecutionResult:
     solve_time_sec: float
 
 
-def _execute_xyce_netlist(
+def run_xyce_netlist(
     *,
     xyce_path: str,
     base_out_dir: Path | str,
@@ -45,52 +55,64 @@ def _execute_xyce_netlist(
     run_name: str = "run",
     target_dir: Optional[Path] = None,
     keep_run_dir: bool = False,
-) -> _XyceExecutionResult:
+) -> XyceExecutionResult:
     if target_dir:
         run_dir = Path(target_dir)
     else:
-        run_dir = Path(base_out_dir).resolve() / run_name
+        base_path = Path(base_out_dir)
+        if not base_path.is_absolute():
+            base_path = base_path.resolve()
+        run_dir = base_path / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
 
     netlist_path = run_dir / "circuit.cir"
     netlist_path.write_text(netlist_content)
+    csv_path = run_dir / csv_name
+    if csv_path.parent != run_dir:
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
 
-    solve_start = time.perf_counter()
-    p = subprocess.run(
+    solve_started_at = time.perf_counter()
+    completed_process = subprocess.run(
         [xyce_path, netlist_path.name],
         cwd=run_dir,
         capture_output=True,
         text=True,
     )
-    solve_time_sec = time.perf_counter() - solve_start
+    solve_time_sec = time.perf_counter() - solve_started_at
 
-    if p.returncode != 0:
-        error_msg = (
-            f"Xyce failed (code {p.returncode}).\n\n"
-            f"--- XYCE STDOUT (Detailed Error) ---\n{p.stdout}\n"
-            f"--- XYCE STDERR ---\n{p.stderr}"
+    if completed_process.returncode != 0:
+        error_message = (
+            f"Xyce failed (code {completed_process.returncode}).\n\n"
+            f"--- XYCE STDOUT (Detailed Error) ---\n{completed_process.stdout}\n"
+            f"--- XYCE STDERR ---\n{completed_process.stderr}"
         )
         raise XyceRunError(
-            error_msg,
-            returncode=p.returncode,
-            stdout=p.stdout,
-            stderr=p.stderr,
+            error_message,
+            returncode=completed_process.returncode,
+            stdout=completed_process.stdout,
+            stderr=completed_process.stderr,
             run_dir=run_dir,
             netlist_path=netlist_path,
-            csv_path=run_dir / csv_name,
+            csv_path=csv_path,
             solve_time_sec=solve_time_sec,
         )
 
-    waveforms = _read_waveforms(run_dir / csv_name)
+    waveforms = _read_waveforms(csv_path)
 
     if not keep_run_dir:
-        artifacts = ["circuit.cir", csv_name, f"{Path(csv_name).stem}.prn"]
-        for art in artifacts:
-            file_to_rem = run_dir / art
-            if file_to_rem.exists():
-                file_to_rem.unlink()
+        artifact_paths = [netlist_path, csv_path, csv_path.with_suffix(".prn")]
+        for artifact_path in artifact_paths:
+            artifact_path.unlink(missing_ok=True)
 
-    return _XyceExecutionResult(run_dir, netlist_path, p.stdout, p.stderr, waveforms, solve_time_sec)
+    return XyceExecutionResult(
+        run_dir,
+        netlist_path,
+        completed_process.stdout,
+        completed_process.stderr,
+        waveforms,
+        solve_time_sec,
+    )
+
 
 class XyceRunError(RuntimeError):
     def __init__(

@@ -1,0 +1,27 @@
+include CONTEXT.md
+include pytest.ini
+include requirements.txt
+
+graft constraints
+graft docs
+graft examples
+graft security
+graft tests
+
+include tools/*.py
+recursive-include tools/cleanroom Dockerfile *.sh
+
+prune .github
+prune .hypothesis
+prune .pkg-venv
+prune .pytest_cache
+prune .venv
+prune _xyce_runs
+prune build
+prune dist
+
+global-exclude .DS_Store
+global-exclude .coverage
+global-exclude *.py[cod]
+global-exclude __pycache__
+global-exclude __pycache__/*

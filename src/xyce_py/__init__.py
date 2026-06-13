@@ -1,6 +1,36 @@
-from .compiler import NetlistCompiler
-from .engine import XyceRunError, find_xyce_executable
+from .compiler import NetlistBody, NetlistCompiler
+from .directives import MeasureDirective, OptionsDirective, ParameterDirective, PrintDirective, RawDirective
+from .engine import XyceExecutionResult, XyceRunError, run_xyce_netlist, find_xyce_executable
+from .features import (
+    AdmsWorkflowSpec,
+    XdmWorkflowSpec,
+    XyceAnalysisSpec,
+    XyceDeviceSpec,
+    XyceDirectiveSpec,
+    XyceFeatureConfig,
+    XyceModelSpec,
+    XyceOutputSpec,
+    XyceReportSpec,
+    XyceWorkflowError,
+    XyceWorkflowResult,
+    XyceWorkflowSpec,
+)
 from .graph import CircuitGraph, CircuitTopologyError
+from .measurements import MeasurementResult, parse_measurements, read_measurements
+from .netlists import XyceProject, XyceProjectResult
+from .outputs import OutputArtifact, OutputSpec
+from .sweeps import (
+    MonteCarloParameter,
+    NormalDistribution,
+    SweepParameter,
+    SweepPoint,
+    SweepRunResult,
+    UniformDistribution,
+    XyceMonteCarloSweep,
+    XyceParameterSweep,
+    XyceParameterSweepResult,
+)
+from .xdm import XdmTranslationError, XdmTranslationResult, XdmTranslator
 from .models import (
     BJT,
     MOSFET,
@@ -11,6 +41,8 @@ from .models import (
     Diode,
     Inductor,
     NTerminalDevice,
+    RawNTerminalDevice,
+    RawTwoTerminalElement,
     Resistor,
     SolveResult,
     Subcircuit,
@@ -19,6 +51,7 @@ from .models import (
 
 __all__ = [
     "BJT",
+    "AdmsWorkflowSpec",
     "BehavioralSource",
     "Capacitor",
     "CircuitElement",
@@ -28,12 +61,52 @@ __all__ = [
     "Diode",
     "Inductor",
     "MOSFET",
+    "MeasureDirective",
+    "MeasurementResult",
+    "MonteCarloParameter",
     "NTerminalDevice",
+    "NetlistBody",
     "NetlistCompiler",
+    "NormalDistribution",
+    "OptionsDirective",
+    "OutputArtifact",
+    "OutputSpec",
+    "ParameterDirective",
+    "PrintDirective",
+    "RawNTerminalDevice",
+    "RawDirective",
+    "RawTwoTerminalElement",
     "Resistor",
     "SolveResult",
     "Subcircuit",
+    "SweepParameter",
+    "SweepPoint",
+    "SweepRunResult",
+    "UniformDistribution",
     "VoltageSource",
+    "XdmWorkflowSpec",
+    "XdmTranslationError",
+    "XdmTranslationResult",
+    "XdmTranslator",
+    "XyceExecutionResult",
+    "XyceAnalysisSpec",
+    "XyceDeviceSpec",
+    "XyceDirectiveSpec",
+    "XyceFeatureConfig",
+    "XyceMonteCarloSweep",
+    "XyceModelSpec",
+    "XyceOutputSpec",
+    "XyceParameterSweep",
+    "XyceParameterSweepResult",
+    "XyceProject",
+    "XyceProjectResult",
+    "XyceReportSpec",
     "XyceRunError",
+    "XyceWorkflowError",
+    "XyceWorkflowResult",
+    "XyceWorkflowSpec",
+    "parse_measurements",
+    "read_measurements",
+    "run_xyce_netlist",
     "find_xyce_executable",
 ]

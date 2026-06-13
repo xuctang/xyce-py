@@ -1,41 +1,42 @@
 import os
 
-def llm_compile(output_file="_llm_context.txt"):
-    # Folders we DO NOT want the AI to read
-    ignore_dirs = {'.venv', '__pycache__', '.git', 'cache', 'log', 'output', 'data'}
-    
-    # File types we actually care about
-    allowed_exts = {'.py', '.json'}
-    
-    compiled_text = ""
 
-    for root, dirs, files in os.walk('.'):
+def compile_context_file(output_file="_llm_context.txt"):
+    # Folders we DO NOT want the AI to read
+    ignored_dirs = {'.venv', '__pycache__', '.git', 'cache', 'log', 'output', 'data'}
+
+    # File types we actually care about
+    included_extensions = {'.py', '.json'}
+
+    context_text = ""
+
+    for root, dirnames, filenames in os.walk('.'):
         # Tell os.walk to skip our ignored directories
-        dirs[:] = [d for d in dirs if d not in ignore_dirs]
-        
-        for file in files:
-            ext = os.path.splitext(file)[1]
-            if ext not in allowed_exts or file == output_file or file == "copy_context.py":
+        dirnames[:] = [dirname for dirname in dirnames if dirname not in ignored_dirs]
+
+        for filename in filenames:
+            extension = os.path.splitext(filename)[1]
+            if extension not in included_extensions or filename == output_file or filename == "copy_context.py":
                 continue
-                
-            filepath = os.path.join(root, file)
-            
+
+            file_path = os.path.join(root, filename)
+
             try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
+                with open(file_path, 'r', encoding='utf-8') as source_file:
+                    file_text = source_file.read()
+
                 # Format it beautifully for the AI
-                compiled_text += f"========== FILE: {filepath} ==========\n"
-                compiled_text += content
-                compiled_text += "\n\n"
-            except Exception as e:
-                print(f"Skipped {filepath}: {e}")
+                context_text += f"========== FILE: {file_path} ==========\n"
+                context_text += file_text
+                context_text += "\n\n"
+            except Exception as exc:
+                print(f"Skipped {file_path}: {exc}")
 
     # Write to a single output file
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(compiled_text)
-        
-    print(f"Successfully compiled {len(compiled_text)} characters into {output_file}!")
+    with open(output_file, 'w', encoding='utf-8') as output_stream:
+        output_stream.write(context_text)
+
+    print(f"Successfully compiled {len(context_text)} characters into {output_file}!")
 
 if __name__ == "__main__":
-    llm_compile()
+    compile_context_file()

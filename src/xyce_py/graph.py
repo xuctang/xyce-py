@@ -1,27 +1,88 @@
 from __future__ import annotations
 
-from collections.abc import Hashable
+from collections.abc import Hashable, Iterable, Mapping
 from pathlib import Path
 import time
 import warnings
 
 import networkx as nx
 
-from .compiler import NetlistCompiler
-from .engine import _execute_xyce_netlist, find_xyce_executable
+from ._validation import validate_non_empty_string as _validate_non_empty_string
+from ._solutions import node_voltage_updates_from_waveforms
+from .compiler import NetlistBody, NetlistCompiler
+from .directives import MeasureDirective, OptionsDirective, ParameterDirective, PrintDirective
+from .engine import run_xyce_netlist, find_xyce_executable
 from .models import CircuitElement, NTerminalDevice, SolveResult
+from .netlists import XyceProject
+from .outputs import OutputSpec, collect_output_artifacts, normalize_output_specs
 
 
-def _validate_non_empty_string(value: object, field_name: str) -> str:
-    if not isinstance(value, str):
-        raise TypeError(f"{field_name} must be a string.")
-    if not value.strip():
-        raise ValueError(f"{field_name} must be a non-empty string.")
-    return value
+def _validate_user_node_id(node_id: Hashable) -> Hashable:
+    if isinstance(node_id, str) and node_id.startswith(("_DEV_", "_INT_")):
+        raise ValueError("node_id cannot start with reserved prefixes '_DEV_' or '_INT_'.")
+    return node_id
 
 
 class CircuitTopologyError(RuntimeError):
     pass
+
+
+def _normalize_solver_params(
+    solver_params: Mapping[str, Mapping[str, object]] | None,
+) -> dict[str, dict[str, str]]:
+    if solver_params is None:
+        return {}
+    if not isinstance(solver_params, Mapping):
+        raise TypeError("solver_params must be a mapping from option package names to option mappings.")
+
+    normalized_params: dict[str, dict[str, str]] = {}
+    for package, values in solver_params.items():
+        directive = OptionsDirective(package, values)
+        if directive.package in normalized_params:
+            raise ValueError(f"Duplicate solver option package: {directive.package!r}.")
+        normalized_params[directive.package] = dict(directive.values)
+    return normalized_params
+
+
+def _contains_top_level_end(directive_text: str) -> bool:
+    for line in directive_text.splitlines():
+        stripped_line = line.strip()
+        if not stripped_line or stripped_line.startswith("*"):
+            continue
+        if stripped_line.split(maxsplit=1)[0].upper() == ".END":
+            return True
+    return False
+
+
+def _normalize_project_directive_item(directive: object) -> str:
+    if isinstance(directive, str):
+        return _validate_non_empty_string(directive, "simulation_directives item").strip()
+    to_spice = getattr(directive, "to_spice", None)
+    if not callable(to_spice):
+        raise TypeError("simulation_directives items must be strings or objects with to_spice().")
+    return _validate_non_empty_string(to_spice(), "simulation_directives item").strip()
+
+
+def _normalize_project_directives(simulation_directives: object) -> tuple[str, ...]:
+    if isinstance(simulation_directives, str) or not isinstance(simulation_directives, Iterable):
+        raise TypeError(
+            "simulation_directives must be a non-empty iterable of strings or to_spice specs."
+        )
+
+    directives = tuple(
+        _normalize_project_directive_item(directive)
+        for directive in simulation_directives
+    )
+    if not directives:
+        raise ValueError(
+            "simulation_directives must be a non-empty iterable of strings or to_spice specs."
+        )
+
+    for directive in directives:
+        if _contains_top_level_end(directive):
+            raise ValueError("simulation_directives must not include '.END'; compile_project appends it.")
+
+    return directives
 
 
 class CircuitGraph:
@@ -29,17 +90,22 @@ class CircuitGraph:
         self,
         xyce_path: str | None = None,
         base_out_dir: str = "_xyce_runs",
-        solver_params: dict | None = None,
+        solver_params: Mapping[str, Mapping[str, object]] | None = None,
     ):
         self.G = nx.MultiDiGraph()
-        self.global_directives: list[str] = []
         self.xyce_path = xyce_path or find_xyce_executable()
         self.base_out_dir = Path(base_out_dir).resolve()
-        self.solver_params = dict(solver_params or {})
+        self.solver_params = _normalize_solver_params(solver_params)
+        self.spice_directives: list[str] = [
+            OptionsDirective(package, values).to_spice()
+            for package, values in self.solver_params.items()
+        ]
+        self.measurement_directives: list[MeasureDirective] = []
 
     def add_node(self, node_id: Hashable, is_ground: bool = False):
         if not isinstance(node_id, Hashable):
             raise TypeError("node_id must be hashable.")
+        node_id = _validate_user_node_id(node_id)
 
         if node_id not in self.G:
             self.G.add_node(node_id)
@@ -98,16 +164,22 @@ class CircuitGraph:
         directive = _validate_non_empty_string(model_string, "model_string")
         if not directive.startswith(".MODEL"):
             raise ValueError("model_string must start with '.MODEL'.")
-        self.global_directives.append(directive)
+        self.spice_directives.append(directive)
 
     def add_options(self, options_string: str):
         directive = _validate_non_empty_string(options_string, "options_string")
         if not directive.startswith(".OPTIONS"):
             raise ValueError("options_string must start with '.OPTIONS'.")
-        self.global_directives.append(directive)
+        self.spice_directives.append(directive)
+
+    def add_parameter(self, name: str, value: object):
+        self.spice_directives.append(ParameterDirective(name, value).to_spice())
+
+    def add_measurement(self, analysis_type: str, name: str, expression: str):
+        self.measurement_directives.append(MeasureDirective(analysis_type, name, expression))
 
     def add_subcircuit(self, subckt_string: str):
-        directive = _validate_non_empty_string(subckt_string, "subckt_string")
+        directive = _validate_non_empty_string(subckt_string, "subckt_string").strip()
         if not directive.startswith(".SUBCKT"):
             raise ValueError("subckt_string must start with '.SUBCKT'.")
         if not directive.endswith(".ENDS"):
@@ -115,7 +187,26 @@ class CircuitGraph:
         # Raw SPICE subcircuits are treated as opaque text here. Arity mismatches
         # between a .SUBCKT definition and a Subcircuit instance are left for Xyce
         # to diagnose at execution time instead of being parsed heuristically.
-        self.global_directives.append(directive)
+        self.spice_directives.append(directive)
+
+    def compile_body(self) -> NetlistBody:
+        self._validate_topology()
+        return NetlistCompiler(self.G, self.spice_directives).compile_body()
+
+    def compile_project(
+        self,
+        name: str,
+        simulation_directives: Iterable[object],
+        output_specs: Iterable[OutputSpec] = (),
+    ) -> XyceProject:
+        compiled_body = self.compile_body()
+        directives = _normalize_project_directives(simulation_directives)
+        netlist_content = "\n".join([*compiled_body.lines, *directives, ".END"]) + "\n"
+        return XyceProject(
+            name,
+            netlist_content,
+            output_specs=tuple(output_specs),
+        )
 
     def simulate(
         self,
@@ -123,39 +214,50 @@ class CircuitGraph:
         *args,
         print_vars: list[str] | None = None,
         inplace: bool = False,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
+        if not isinstance(keep_run_dir, bool):
+            raise TypeError("keep_run_dir must be a boolean.")
+        normalized_output_specs = normalize_output_specs(output_specs or ())
+        if normalized_output_specs and not keep_run_dir:
+            raise ValueError("keep_run_dir=True is required when output_specs are requested.")
+
         analysis_type, resolved_analysis_cmd, resolved_print_vars = self._normalize_simulation_request(
             analysis_cmd,
             args,
             print_vars,
         )
 
-        original_graph = self.G.copy()
-        self._validate_topology()
-        compiler = NetlistCompiler(self.G, self.global_directives)
-        netlist_lines = compiler._compile_body_lines()
+        compiled_body = self.compile_body()
+        if compiled_body.expanded_graph is None:
+            raise RuntimeError("Compiler did not produce an expanded graph.")
+        netlist_lines = list(compiled_body.lines)
         resolved_print_vars = self._resolve_print_vars(
             resolved_print_vars,
-            compiler.node_map_forward,
+            compiled_body.user_to_spice_node,
         )
         print_analysis_type = "DC" if analysis_type == "OP" else analysis_type
         netlist_lines.append(resolved_analysis_cmd)
-        netlist_lines.append(
-            f".PRINT {print_analysis_type} FORMAT=CSV FILE=output.csv {' '.join(resolved_print_vars)}"
+        netlist_lines.append(PrintDirective(print_analysis_type, resolved_print_vars).to_spice())
+        netlist_lines.extend(
+            self._compiled_measurement_lines(compiled_body.user_to_spice_node)
         )
         netlist_lines.append(".END")
         final_netlist = "\n".join(netlist_lines) + "\n"
 
-        execution_result = _execute_xyce_netlist(
+        execution_result = run_xyce_netlist(
             xyce_path=self.xyce_path,
             base_out_dir=self.base_out_dir,
             netlist_content=final_netlist,
             csv_name="output.csv",
             run_name=f"simulate_{analysis_type.lower()}_{time.time_ns()}",
-            keep_run_dir=False,
+            keep_run_dir=keep_run_dir,
         )
+        outputs = collect_output_artifacts(execution_result.run_dir, normalized_output_specs)
 
-        expanded_graph = compiler.expanded_graph.copy()
+        original_graph = self.G.copy()
+        expanded_graph = compiled_body.expanded_graph
         waveforms = execution_result.waveforms
         if inplace:
             if len(waveforms) != 1:
@@ -163,7 +265,7 @@ class CircuitGraph:
                     "Cannot use inplace=True with multi-point sweeps. "
                     "Extract data from SolveResult.waveforms instead."
                 )
-            self._apply_inplace_solution(waveforms, compiler.node_map_inverse)
+            self._apply_inplace_solution(waveforms, compiled_body.spice_to_user_node)
 
         return SolveResult(
             original_graph=original_graph,
@@ -172,15 +274,24 @@ class CircuitGraph:
             waveforms=waveforms,
             solve_time_sec=execution_result.solve_time_sec,
             stdout=execution_result.stdout,
-            node_map_inverse=compiler.node_map_inverse.copy(),
+            spice_to_user_node=dict(compiled_body.spice_to_user_node),
+            outputs=outputs,
         )
 
     def simulate_op(
         self,
         print_vars: list[str] | None = None,
         inplace: bool = False,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
-        return self.simulate(".OP", print_vars=print_vars, inplace=inplace)
+        return self.simulate(
+            ".OP",
+            print_vars=print_vars,
+            inplace=inplace,
+            output_specs=output_specs,
+            keep_run_dir=keep_run_dir,
+        )
 
     def simulate_transient(
         self,
@@ -189,6 +300,8 @@ class CircuitGraph:
         start: str = "0",
         print_vars: list[str] | None = None,
         inplace: bool = False,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
         step = _validate_non_empty_string(step, "step")
         stop = _validate_non_empty_string(stop, "stop")
@@ -196,7 +309,13 @@ class CircuitGraph:
         analysis_cmd = f".TRAN {step} {stop}"
         if start != "0":
             analysis_cmd += f" {start}"
-        return self.simulate(analysis_cmd, print_vars=print_vars, inplace=inplace)
+        return self.simulate(
+            analysis_cmd,
+            print_vars=print_vars,
+            inplace=inplace,
+            output_specs=output_specs,
+            keep_run_dir=keep_run_dir,
+        )
 
     def simulate_ac(
         self,
@@ -205,6 +324,8 @@ class CircuitGraph:
         start_freq: str,
         stop_freq: str,
         print_vars: list[str] | None = None,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
         sweep_type = _validate_non_empty_string(sweep_type, "sweep_type")
         points = _validate_non_empty_string(points, "points")
@@ -214,6 +335,8 @@ class CircuitGraph:
             f".AC {sweep_type} {points} {start_freq} {stop_freq}",
             print_vars=print_vars,
             inplace=False,
+            output_specs=output_specs,
+            keep_run_dir=keep_run_dir,
         )
 
     def simulate_dc(
@@ -223,6 +346,8 @@ class CircuitGraph:
         stop: str,
         step: str,
         print_vars: list[str] | None = None,
+        output_specs: Iterable[OutputSpec] | None = None,
+        keep_run_dir: bool = False,
     ) -> SolveResult:
         source_name = _validate_non_empty_string(source_name, "source_name")
         start = _validate_non_empty_string(start, "start")
@@ -232,23 +357,23 @@ class CircuitGraph:
             f".DC {source_name} {start} {stop} {step}",
             print_vars=print_vars,
             inplace=False,
+            output_specs=output_specs,
+            keep_run_dir=keep_run_dir,
         )
 
     def _validate_topology(self):
-        ground_nodes = [
+        ground_node_ids = [
             node_id for node_id, data in self.G.nodes(data=True) if data.get("is_ground") is True
         ]
-        if not ground_nodes:
+        if not ground_node_ids:
             raise CircuitTopologyError("Circuit has no ground reference.")
-        if len(ground_nodes) > 1:
+        if len(ground_node_ids) > 1:
             raise CircuitTopologyError("Circuit has multiple ground references.")
 
-        ground_node = ground_nodes[0]
-        components = list(nx.weakly_connected_components(self.G))
-        if len(components) > 1:
-            for component in components:
-                if ground_node not in component:
-                    raise CircuitTopologyError("Floating subgraph detected with no path to ground.")
+        ground_node_id = ground_node_ids[0]
+        for component_nodes in nx.weakly_connected_components(self.G):
+            if ground_node_id not in component_nodes:
+                raise CircuitTopologyError("Floating subgraph detected with no path to ground.")
 
     def _find_ground_node(self):
         for node_id, data in self.G.nodes(data=True):
@@ -259,13 +384,15 @@ class CircuitGraph:
     def _resolve_print_vars(
         self,
         print_vars: list[str] | None,
-        node_map_forward: dict[object, str],
+        user_to_spice_node: dict[object, str],
     ) -> list[str]:
         if print_vars is None:
-            resolved = [f"V({spice_id})" for spice_id in node_map_forward.values() if spice_id != "0"]
-            if not resolved:
+            default_print_vars = [
+                f"V({spice_node})" for spice_node in user_to_spice_node.values() if spice_node != "0"
+            ]
+            if not default_print_vars:
                 raise ValueError("No non-ground user nodes available for default print_vars.")
-            return resolved
+            return default_print_vars
 
         if not isinstance(print_vars, list) or not print_vars:
             raise ValueError("print_vars must be a non-empty list of strings.")
@@ -274,20 +401,20 @@ class CircuitGraph:
     def _normalize_simulation_request(
         self,
         analysis_cmd: str,
-        args: tuple[object, ...],
+        legacy_args: tuple[object, ...],
         print_vars: list[str] | None,
     ) -> tuple[str, str, list[str] | None]:
-        if args:
-            if len(args) > 2:
+        if legacy_args:
+            if len(legacy_args) > 2:
                 raise TypeError("simulate() accepts at most two deprecated positional arguments.")
             legacy_analysis_type = _validate_non_empty_string(analysis_cmd, "analysis_type").upper()
-            resolved_analysis_cmd = _validate_non_empty_string(args[0], "analysis_cmd").strip()
+            resolved_analysis_cmd = _validate_non_empty_string(legacy_args[0], "analysis_cmd").strip()
             if not resolved_analysis_cmd.upper().startswith(f".{legacy_analysis_type}"):
                 raise ValueError(f"analysis_cmd must start with '.{legacy_analysis_type}'.")
-            if len(args) == 2:
+            if len(legacy_args) == 2:
                 if print_vars is not None:
                     raise TypeError("print_vars must be passed once.")
-                print_vars = args[1]
+                print_vars = legacy_args[1]
             warnings.warn(
                 "simulate(analysis_type, analysis_cmd, ...) is deprecated; "
                 "use simulate(analysis_cmd, ...) instead.",
@@ -301,29 +428,38 @@ class CircuitGraph:
         return analysis_type, resolved_analysis_cmd, print_vars
 
     def _infer_analysis_type(self, analysis_cmd: str) -> str:
-        first_token = analysis_cmd.split(maxsplit=1)[0].upper()
-        if not first_token.startswith("."):
+        directive_token = analysis_cmd.split(maxsplit=1)[0].upper()
+        if not directive_token.startswith("."):
             raise ValueError("analysis_cmd must start with a SPICE analysis directive like '.OP'.")
-        analysis_type = first_token[1:]
+        analysis_type = directive_token[1:]
         if analysis_type not in {"OP", "TRAN", "AC", "DC"}:
             raise ValueError("analysis_cmd must start with one of: .OP, .TRAN, .AC, .DC.")
         return analysis_type
 
-    def _apply_inplace_solution(self, waveforms, node_map_inverse: dict[str, object]):
-        solved_values: dict[object, object] = {}
-        row = waveforms.iloc[0]
-        for column, value in row.items():
-            if not (isinstance(column, str) and column.startswith("V(") and column.endswith(")")):
-                continue
-            spice_id = column[2:-1]
-            if spice_id == "0" or spice_id not in node_map_inverse:
-                continue
-            original_id = node_map_inverse[spice_id]
-            if "solved_voltage" in self.G.nodes[original_id]:
+    def _compiled_measurement_lines(self, user_to_spice_node: Mapping[object, str]) -> list[str]:
+        measurement_lines: list[str] = []
+        for directive in self.measurement_directives:
+            expression = directive.expression
+            for user_node, spice_node in user_to_spice_node.items():
+                if not isinstance(user_node, str):
+                    continue
+                expression = expression.replace(f"V({user_node})", f"V({spice_node})")
+            measurement_lines.append(
+                MeasureDirective(directive.analysis_type, directive.name, expression).to_spice()
+            )
+        return measurement_lines
+
+    def _apply_inplace_solution(self, waveforms, spice_to_user_node: Mapping[str, object]):
+        node_voltage_updates = node_voltage_updates_from_waveforms(
+            waveforms,
+            spice_to_user_node,
+            row=0,
+        )
+        for user_node_id in node_voltage_updates:
+            if "solved_voltage" in self.G.nodes[user_node_id]:
                 raise RuntimeError(
                     "Attribute 'solved_voltage' already exists on node. Use inplace=False."
                 )
-            solved_values[original_id] = value
 
-        for original_id, value in solved_values.items():
-            self.G.nodes[original_id]["solved_voltage"] = value
+        for user_node_id, value in node_voltage_updates.items():
+            self.G.nodes[user_node_id]["solved_voltage"] = value
