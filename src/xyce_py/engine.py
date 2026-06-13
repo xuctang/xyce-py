@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 import subprocess
+import sys
 import time
 
 import pandas as pd
@@ -12,10 +13,22 @@ import pandas as pd
 from .outputs import read_csv_output
 
 
+def _candidate_xyce_paths() -> tuple[Path, ...]:
+    candidates = [
+        Path("/usr/local/XyceNF_7.10/bin/Xyce"),
+        *sorted(Path("/usr/local").glob("Xyce-Release-*/bin/Xyce")),
+        *sorted(Path("/usr/local").glob("XyceNF_*/bin/Xyce")),
+    ]
+    windows_program_files = Path("C:/Program Files")
+    if sys.platform == "win32" and windows_program_files.exists():
+        candidates.extend(sorted(windows_program_files.glob("Xyce*/bin/Xyce.exe")))
+    return tuple(candidates)
+
+
 def find_xyce_executable() -> str:
-    default_xyce_path = "/usr/local/XyceNF_7.10/bin/Xyce"
-    if Path(default_xyce_path).exists():
-        return default_xyce_path
+    for candidate_path in _candidate_xyce_paths():
+        if candidate_path.exists():
+            return str(candidate_path)
     return shutil.which("Xyce") or "Xyce"
 
 

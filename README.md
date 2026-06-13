@@ -35,11 +35,18 @@ For runnable user pipelines, see the [examples](examples/README.md).
 ## Requirements
 
 - Python 3.10 or newer.
-- Sandia Xyce installed separately and available either at
-  `/usr/local/XyceNF_7.10/bin/Xyce` or on your `PATH` as `Xyce`.
+- A separately installed Sandia Xyce executable for simulation runs.
 
-Xyce is not bundled with this package. Install it from Sandia National
-Laboratories before running simulations.
+Xyce is not bundled with this package. Install Xyce from Sandia National
+Laboratories before running simulations. Official entry points:
+
+- [Xyce downloads](https://xyce.sandia.gov/downloads/)
+- [Xyce executable packages](https://xyce.sandia.gov/downloads/executables/)
+- [Xyce documentation](https://xyce.sandia.gov/documentation/)
+
+`xyce-py` looks for Xyce in common Sandia installer layouts under
+`/usr/local`, Windows `Program Files`, and then on your `PATH` as `Xyce`.
+You can always pass an explicit executable path with `xyce_path=...`.
 
 ## Installation
 
@@ -58,13 +65,45 @@ python -m pip install --upgrade pip
 python -m pip install -e '.[test]'
 ```
 
+## Configure Xyce
+
+Start here if you have no local setup yet:
+
+1. Install Python 3.10 or newer.
+2. Create and activate a virtual environment.
+3. Install `xyce-py` with `python -m pip install xyce-py`.
+4. Install Xyce from Sandia's executable packages page.
+5. Confirm the Xyce executable works:
+
+```bash
+Xyce -v
+```
+
+If that command is not found, either add Xyce's `bin` directory to your `PATH`
+or pass the full executable path when constructing a graph or project:
+
+```python
+graph = CircuitGraph(xyce_path="/path/to/Xyce")
+result = project.run(xyce_path="/path/to/Xyce")
+```
+
+Check what executable `xyce-py` will use:
+
+```bash
+python -c "from xyce_py import find_xyce_executable; print(find_xyce_executable())"
+```
+
+If the command prints only `Xyce`, `xyce-py` will rely on your shell `PATH`.
+If it prints an absolute path, that path was discovered from a known installer
+layout.
+
 ## Quick Start
 
 This example builds a voltage divider and compiles it to a netlist. It does not
 run Xyce.
 
 ```python
-from xyce_py import CircuitGraph, NetlistCompiler, Resistor, VoltageSource
+from xyce_py import CircuitGraph, Resistor, VoltageSource
 
 graph = CircuitGraph(xyce_path="Xyce")
 graph.add_node("gnd", is_ground=True)
@@ -72,7 +111,8 @@ graph.add_branch("vin", "gnd", [VoltageSource("supply", 5.0)])
 graph.add_branch("vin", "vout", [Resistor("r1", 1000)])
 graph.add_branch("vout", "gnd", [Resistor("r2", 1000)])
 
-netlist = NetlistCompiler(graph.G, graph.spice_directives).compile()
+compiled_body = graph.compile_body()
+netlist = "\n".join([*compiled_body.lines, ".END"]) + "\n"
 print(netlist)
 ```
 
@@ -418,6 +458,19 @@ device_line = XyceDeviceSpec("D1", ["out", "0"], model_name="DFAST").to_spice()
 If Xyce exits with a non-zero status, `xyce-py` raises `XyceRunError` with the
 return code, stdout, stderr, run directory, netlist path, CSV path, and elapsed
 solve time.
+
+## Troubleshooting Setup
+
+- `Xyce -v` is not found: install Xyce from Sandia, then add the Xyce `bin`
+  directory to `PATH`, or pass `xyce_path="/path/to/Xyce"` explicitly.
+- `find_xyce_executable()` prints `Xyce`: no known installer path was found, so
+  subprocess execution depends on your current shell `PATH`.
+- A simulation fails but compile-only examples work: inspect the `XyceRunError`
+  stdout/stderr fields. Xyce remains responsible for netlist semantics.
+- Extra output files are missing: declare them with `OutputSpec` and use
+  `keep_run_dir=True` so the files still exist after return.
+- Real-Xyce tests skip locally: install Xyce or pass a valid executable path in
+  the test fixture environment.
 
 ## Development and Testing
 

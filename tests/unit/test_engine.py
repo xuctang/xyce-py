@@ -17,14 +17,42 @@ def _completed_process(*, returncode: int = 0, stdout: str = "stdout", stderr: s
     return subprocess.CompletedProcess(args=["Xyce", "circuit.cir"], returncode=returncode, stdout=stdout, stderr=stderr)
 
 
-def test_find_xyce_executable_prefers_known_install_path(monkeypatch):
-    monkeypatch.setattr(engine.Path, "exists", lambda self: str(self) == "/usr/local/XyceNF_7.10/bin/Xyce")
+def test_find_xyce_executable_prefers_known_install_paths(monkeypatch):
+    monkeypatch.setattr(
+        engine,
+        "_candidate_xyce_paths",
+        lambda: (
+            Path("/missing/Xyce"),
+            Path("/usr/local/Xyce-Release-7.10-NORAD/bin/Xyce"),
+        ),
+    )
+    monkeypatch.setattr(
+        engine.Path,
+        "exists",
+        lambda self: str(self) == "/usr/local/Xyce-Release-7.10-NORAD/bin/Xyce",
+    )
     monkeypatch.setattr(engine.shutil, "which", lambda _: "/usr/bin/Xyce")
 
-    assert find_xyce_executable() == "/usr/local/XyceNF_7.10/bin/Xyce"
+    assert find_xyce_executable() == "/usr/local/Xyce-Release-7.10-NORAD/bin/Xyce"
+
+
+def test_candidate_xyce_paths_include_windows_program_files_on_windows(monkeypatch):
+    def _fake_glob(path: Path, pattern: str):
+        if str(path) == "/usr/local":
+            return []
+        if str(path) == "C:/Program Files" and pattern == "Xyce*/bin/Xyce.exe":
+            return [Path("C:/Program Files/Xyce/bin/Xyce.exe")]
+        return []
+
+    monkeypatch.setattr(engine.sys, "platform", "win32")
+    monkeypatch.setattr(engine.Path, "exists", lambda self: str(self) == "C:/Program Files")
+    monkeypatch.setattr(engine.Path, "glob", _fake_glob)
+
+    assert Path("C:/Program Files/Xyce/bin/Xyce.exe") in engine._candidate_xyce_paths()
 
 
 def test_find_xyce_executable_uses_path_lookup_when_known_path_is_missing(monkeypatch):
+    monkeypatch.setattr(engine, "_candidate_xyce_paths", lambda: (Path("/missing/Xyce"),))
     monkeypatch.setattr(engine.Path, "exists", lambda self: False)
     monkeypatch.setattr(engine.shutil, "which", lambda _: "/usr/bin/Xyce")
 
@@ -32,6 +60,7 @@ def test_find_xyce_executable_uses_path_lookup_when_known_path_is_missing(monkey
 
 
 def test_find_xyce_executable_returns_literal_xyce_when_nothing_is_found(monkeypatch):
+    monkeypatch.setattr(engine, "_candidate_xyce_paths", lambda: (Path("/missing/Xyce"),))
     monkeypatch.setattr(engine.Path, "exists", lambda self: False)
     monkeypatch.setattr(engine.shutil, "which", lambda _: None)
 

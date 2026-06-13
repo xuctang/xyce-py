@@ -864,7 +864,9 @@ Returns:
 
 `find_xyce_executable()`
 
-Returns the preferred Xyce executable path. It checks `/usr/local/XyceNF_7.10/bin/Xyce`, then `PATH`, then returns `"Xyce"`.
+Returns the preferred Xyce executable path. It checks known Sandia installer
+layouts under `/usr/local`, Windows `Program Files`, then `PATH`, then returns
+`"Xyce"` so subprocess execution can still rely on the caller's shell path.
 
 ### `run_xyce_netlist`
 
