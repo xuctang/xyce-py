@@ -27,7 +27,8 @@ jobs:
           "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pip install -e '.[test]'
 
       - name: Run Xyce smoke test
-        run: "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration/test_xyce_runner_smoke.py -m xyce -q
+        run: |
+          "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration/test_xyce_runner_smoke.py -m xyce -q
 
       - name: Write Linux runner summary
         if: always()
@@ -72,7 +73,8 @@ jobs:
           "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pip install -e '.[test]'
 
       - name: Run Xyce smoke test
-        run: "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration/test_xyce_runner_smoke.py -m xyce -q
+        run: |
+          "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration/test_xyce_runner_smoke.py -m xyce -q
 
       - name: Write macOS runner summary
         if: always()

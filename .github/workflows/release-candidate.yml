@@ -47,7 +47,8 @@ jobs:
           "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pip install -e '.[test]'
 
       - name: Run real Xyce integration suite
-        run: "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration -m xyce
+        run: |
+          "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration -m xyce
 
       - name: Write Linux Xyce gate summary
         if: always()
@@ -93,7 +94,8 @@ jobs:
           "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pip install -e '.[test]'
 
       - name: Run real Xyce integration suite
-        run: "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration -m xyce
+        run: |
+          "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration -m xyce
 
       - name: Write macOS Xyce gate summary
         if: always()
