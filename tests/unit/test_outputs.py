@@ -31,7 +31,22 @@ def test_output_spec_rejects_invalid_names(bad_name):
         OutputSpec.csv(bad_name, "output.csv")
 
 
-@pytest.mark.parametrize("bad_path", ["", " \t ", ".", "/tmp/output.csv", "../output.csv", "a/../b.csv", None, 3])
+@pytest.mark.parametrize(
+    "bad_path",
+    [
+        "",
+        " \t ",
+        ".",
+        "/tmp/output.csv",
+        "C:/tmp/output.csv",
+        r"\tmp\output.csv",
+        "../output.csv",
+        "a/../b.csv",
+        r"a\..\b.csv",
+        None,
+        3,
+    ],
+)
 def test_output_spec_rejects_invalid_paths(bad_path):
     with pytest.raises((TypeError, ValueError)):
         OutputSpec.csv("waveforms", bad_path)

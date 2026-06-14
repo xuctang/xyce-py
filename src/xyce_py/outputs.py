@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
 from typing import Literal
 
@@ -17,11 +17,18 @@ OutputKind = Literal["csv", "text"]
 def validate_relative_output_path(output_path: object, field_name: str) -> str:
     output_path = _validate_non_empty_string(output_path, field_name)
     path = Path(output_path)
-    if path.is_absolute():
+    posix_path = PurePosixPath(output_path)
+    windows_path = PureWindowsPath(output_path)
+    if (
+        path.is_absolute()
+        or posix_path.is_absolute()
+        or windows_path.drive
+        or windows_path.root
+    ):
         raise ValueError(f"{field_name} must be a relative path inside the Xyce run directory.")
     if output_path == "." or not path.name:
         raise ValueError(f"{field_name} must point to a file inside the Xyce run directory.")
-    if any(part == ".." for part in path.parts):
+    if any(part == ".." for part in (*path.parts, *posix_path.parts, *windows_path.parts)):
         raise ValueError(f"{field_name} cannot contain '..' path traversal.")
     return output_path
 
