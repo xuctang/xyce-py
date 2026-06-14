@@ -1,6 +1,8 @@
 include CONTEXT.md
+include CHANGELOG.md
 include pytest.ini
 include requirements.txt
+include SECURITY.md
 
 graft constraints
 graft docs
