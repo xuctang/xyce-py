@@ -35,15 +35,19 @@ jobs:
           python3 --version
           python3 - <<'PY'
           import sys
+          import venv
           if sys.version_info < (3, 10):
               raise SystemExit("Python 3.10 or newer is required on the self-hosted runner.")
           PY
 
       - name: Install test dependencies
-        run: python3 -m pip install --upgrade pip && python3 -m pip install -e '.[test]'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/xyce-py-venv"
+          "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pip install -e '.[test]'
 
       - name: Run real Xyce integration suite
-        run: python3 -m pytest tests/integration -m xyce
+        run: "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration -m xyce
 
       - name: Write Linux Xyce gate summary
         if: always()
@@ -53,7 +57,11 @@ jobs:
             echo ""
             echo "- Runner OS: $RUNNER_OS"
             echo "- Runner Architecture: $RUNNER_ARCH"
-            echo "- Python: $(python3 --version 2>&1)"
+            if [[ -x "$RUNNER_TEMP/xyce-py-venv/bin/python" ]]; then
+              echo "- Python: $("$RUNNER_TEMP/xyce-py-venv/bin/python" --version 2>&1)"
+            else
+              echo "- Python: $(python3 --version 2>&1)"
+            fi
             echo "- Xyce path: $(command -v Xyce || echo 'not found')"
             echo "- Xyce version:"
             echo '```text'
@@ -73,15 +81,19 @@ jobs:
           python3 --version
           python3 - <<'PY'
           import sys
+          import venv
           if sys.version_info < (3, 10):
               raise SystemExit("Python 3.10 or newer is required on the self-hosted runner.")
           PY
 
       - name: Install test dependencies
-        run: python3 -m pip install --upgrade pip && python3 -m pip install -e '.[test]'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/xyce-py-venv"
+          "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pip install -e '.[test]'
 
       - name: Run real Xyce integration suite
-        run: python3 -m pytest tests/integration -m xyce
+        run: "$RUNNER_TEMP/xyce-py-venv/bin/python" -m pytest tests/integration -m xyce
 
       - name: Write macOS Xyce gate summary
         if: always()
@@ -91,7 +103,11 @@ jobs:
             echo ""
             echo "- Runner OS: $RUNNER_OS"
             echo "- Runner Architecture: $RUNNER_ARCH"
-            echo "- Python: $(python3 --version 2>&1)"
+            if [[ -x "$RUNNER_TEMP/xyce-py-venv/bin/python" ]]; then
+              echo "- Python: $("$RUNNER_TEMP/xyce-py-venv/bin/python" --version 2>&1)"
+            else
+              echo "- Python: $(python3 --version 2>&1)"
+            fi
             echo "- Xyce path: $(command -v Xyce || echo 'not found')"
             echo "- Xyce version:"
             echo '```text'
