@@ -90,7 +90,19 @@ def test_print_directive_rejects_invalid_variables(variables):
         PrintDirective("DC", variables)
 
 
-@pytest.mark.parametrize("bad_file", ["", " ", ".", "../output.csv", "/tmp/output.csv"])
+@pytest.mark.parametrize(
+    "bad_file",
+    [
+        "",
+        " ",
+        ".",
+        "../output.csv",
+        "/tmp/output.csv",
+        "C:/tmp/output.csv",
+        r"\tmp\output.csv",
+        r"a\..\b.csv",
+    ],
+)
 def test_print_directive_rejects_invalid_output_file_paths(bad_file):
     with pytest.raises(ValueError):
         PrintDirective("DC", ["V(1)"], file=bad_file)
