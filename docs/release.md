@@ -10,6 +10,7 @@ clean-room post-publish smoke pass.
 - A Linux self-hosted runner labeled `self-hosted`, `linux`, `xyce` is online.
 - A macOS self-hosted runner labeled `self-hosted`, `macos`, `xyce` is online.
 - Both self-hosted runners have `Xyce` available on `PATH`.
+- Both self-hosted runners have `python3` 3.10 or newer with `pip` available.
 - `security/pip_audit_allowlist.json` is either empty or contains only unexpired entries with a documented owner and reason.
 
 ## First-Release Checklist
