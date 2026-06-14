@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+import sys
+from textwrap import dedent
+
 import pytest
 
 from xyce_py.xdm import XdmTranslationError, XdmTranslator
@@ -8,28 +12,35 @@ from xyce_py.xdm import XdmTranslationError, XdmTranslator
 pytestmark = pytest.mark.unit
 
 
-def _write_executable(path, content: str):
-    path.write_text(content)
-    path.chmod(0o755)
+def _write_python_script(path: Path, content: str) -> Path:
+    path.write_text(dedent(content), encoding="utf-8")
     return path
 
 
 def test_xdm_translator_runs_external_translator_and_reads_expected_output(tmp_path):
-    translator_path = _write_executable(
-        tmp_path / "fake_xdm",
-        """#!/bin/sh
-printf 'translated %s %s\\n' "$1" "$2"
-printf '* translated netlist\\n.END\\n' > "$2"
-""",
+    translator_script = _write_python_script(
+        tmp_path / "fake_xdm.py",
+        """
+        from pathlib import Path
+        import sys
+
+        sys.stdout.write(f"translated {sys.argv[1]} {sys.argv[2]}\\n")
+        Path(sys.argv[2]).write_text("* translated netlist\\n.END\\n", encoding="utf-8")
+        """,
     )
 
-    result = XdmTranslator(str(translator_path)).run(
-        ["source.sp", "translated.cir"],
+    result = XdmTranslator(sys.executable).run(
+        [str(translator_script), "source.sp", "translated.cir"],
         working_dir=tmp_path,
         expected_output="translated.cir",
     )
 
-    assert result.command == (str(translator_path), "source.sp", "translated.cir")
+    assert result.command == (
+        sys.executable,
+        str(translator_script),
+        "source.sp",
+        "translated.cir",
+    )
     assert result.working_dir == tmp_path.resolve()
     assert result.stdout == "translated source.sp translated.cir\n"
     assert result.stderr == ""
@@ -37,31 +48,38 @@ printf '* translated netlist\\n.END\\n' > "$2"
 
 
 def test_xdm_translator_defaults_working_dir_to_current_directory(monkeypatch, tmp_path):
-    translator_path = _write_executable(
-        tmp_path / "fake_xdm",
-        """#!/bin/sh
-pwd
-""",
+    translator_script = _write_python_script(
+        tmp_path / "fake_xdm.py",
+        """
+        from pathlib import Path
+
+        print(Path.cwd())
+        """,
     )
     monkeypatch.chdir(tmp_path)
 
-    result = XdmTranslator(str(translator_path)).run([])
+    result = XdmTranslator(sys.executable).run([str(translator_script)])
 
     assert result.working_dir == tmp_path.resolve()
-    assert result.stdout == f"{tmp_path}\n"
+    assert result.stdout == f"{tmp_path.resolve()}\n"
 
 
 def test_xdm_translator_raises_structured_error_for_failed_translation(tmp_path):
-    translator_path = _write_executable(
-        tmp_path / "fake_xdm_fail",
-        """#!/bin/sh
-printf 'bad input\\n' >&2
-exit 7
-""",
+    translator_script = _write_python_script(
+        tmp_path / "fake_xdm_fail.py",
+        """
+        import sys
+
+        sys.stderr.write("bad input\\n")
+        raise SystemExit(7)
+        """,
     )
 
     with pytest.raises(XdmTranslationError, match="XDM failed") as caught:
-        XdmTranslator(str(translator_path)).run(["source.sp"], working_dir=tmp_path)
+        XdmTranslator(sys.executable).run(
+            [str(translator_script), "source.sp"],
+            working_dir=tmp_path,
+        )
 
     assert caught.value.returncode == 7
     assert caught.value.stderr == "bad input\n"
@@ -69,16 +87,16 @@ exit 7
 
 
 def test_xdm_translator_rejects_missing_expected_output(tmp_path):
-    translator_path = _write_executable(
-        tmp_path / "fake_xdm_no_output",
-        """#!/bin/sh
-exit 0
-""",
+    translator_script = _write_python_script(
+        tmp_path / "fake_xdm_no_output.py",
+        """
+        raise SystemExit(0)
+        """,
     )
 
     with pytest.raises(FileNotFoundError, match="Expected XDM output"):
-        XdmTranslator(str(translator_path)).run(
-            ["source.sp"],
+        XdmTranslator(sys.executable).run(
+            [str(translator_script), "source.sp"],
             working_dir=tmp_path,
             expected_output="missing.cir",
         )
@@ -104,14 +122,17 @@ def test_xdm_translator_validates_inputs(tmp_path):
 
 
 def test_xdm_translation_result_requires_declared_output_for_text_read(tmp_path):
-    translator_path = _write_executable(
-        tmp_path / "fake_xdm",
-        """#!/bin/sh
-exit 0
-""",
+    translator_script = _write_python_script(
+        tmp_path / "fake_xdm.py",
+        """
+        raise SystemExit(0)
+        """,
     )
 
-    result = XdmTranslator(str(translator_path)).run([], working_dir=tmp_path)
+    result = XdmTranslator(sys.executable).run(
+        [str(translator_script)],
+        working_dir=tmp_path,
+    )
 
     with pytest.raises(ValueError, match="No expected output path"):
         result.translated_netlist_text()
